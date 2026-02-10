@@ -1,5 +1,27 @@
 # POST.Project 
 
+Setting up reflex: 
+
+**Installing uv:
+
+``powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"``
+
+**Sync the project: 
+
+``uv sync``
+
+**Run the app: 
+
+``uv run reflex run``
+*if this doesn't work, try: 
+``uvx reflex run``
+
+**INSTALL DOCKER. 
+
+https://docs.docker.com/desktop/setup/install/windows-install/
+
+
+
 ## Getting started
 
 To make it easy for you to get started with GitLab, here's a list of recommended next steps.
