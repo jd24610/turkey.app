@@ -6,7 +6,7 @@ Setting up reflex:
 
 ``Invoke-WebRequest -Uri "https://astral.sh/uv/install.ps1" -OutFile "$env:TEMP\install_uv.ps1" powershell.exe -ExecutionPolicy Bypass -File "$env:TEMP\install_uv.ps1"``
 
-**Sync the project: 
+**Sync the project: (i.e., import all dependencies through pyproject.toml)
 
 ``uv sync``
 
@@ -16,8 +16,3 @@ Setting up reflex:
 *if this doesn't work, try: 
 ``uvx reflex run``
 
-
-**INSTALL DOCKER. (needed for interfacing with lightning.ai.)
-Ensures compatability with the cloud service's platform 
-
-https://docs.docker.com/desktop/setup/install/windows-install/
