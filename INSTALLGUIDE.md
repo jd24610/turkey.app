@@ -4,7 +4,7 @@ Setting up reflex:
 
 **Installing uv: (if you haven't already)
 
-``powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"``
+``Invoke-WebRequest -Uri "https://astral.sh/uv/install.ps1" -OutFile "$env:TEMP\install_uv.ps1" powershell.exe -ExecutionPolicy Bypass -File "$env:TEMP\install_uv.ps1"``
 
 **Sync the project: 
 

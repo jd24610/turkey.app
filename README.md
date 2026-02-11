@@ -12,7 +12,7 @@ Setting up reflex:
 
 **Run the app: 
 
-``uv run reflex run``
+``uv reflex run``
 *if this doesn't work, try: 
 ``uvx reflex run``
 
