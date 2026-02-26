@@ -1,105 +1,242 @@
+"""Welcome to Reflex! This file outlines the steps to create a basic app."""
+
 import reflex as rx
-from .state import State
-from .models import Image
 
-def login_form() -> rx.Component:
-    return rx.vstack(
-        rx.heading("Login", size="7"),
-        rx.text(State.auth_error, color="red"),
-        rx.form(
+from rxconfig import config
+from TurkeyApp.react_oauth_google import google_oauth_provider, google_login
+from TurkeyApp.upload_state import UploadState
+from TurkeyApp.import_export_page import import_export_page
+
+
+class State(rx.State):
+    """The app state."""
+    id_token_json: str = ""
+    user_email: str = ""
+    user_name: str = ""
+
+    @rx.var
+    def is_authenticated(self) -> bool:
+        return bool(self.id_token_json)
+
+    def on_success(self, id_token: dict):
+        self.id_token_json = str(id_token)
+        # Extract email / name from the credential response if present
+        cred = id_token.get("credential", "")
+        # Decode JWT payload (middle segment) without verification for display
+        try:
+            import base64, json as _json
+            payload_b64 = cred.split(".")[1]
+            # Pad base64
+            payload_b64 += "=" * (-len(payload_b64) % 4)
+            payload = _json.loads(base64.urlsafe_b64decode(payload_b64))
+            self.user_email = payload.get("email", "")
+            self.user_name = payload.get("name", "")
+        except Exception:
+            self.user_email = ""
+            self.user_name = ""
+        return rx.redirect("/library")
+
+    def logout(self):
+        self.id_token_json = ""
+        self.user_email = ""
+        self.user_name = ""
+        return rx.redirect("/")
+
+
+def login_page() -> rx.Component:
+    return google_oauth_provider(
+        rx.box(
             rx.vstack(
-                rx.input(placeholder="Email", name="email"),
-                rx.input(placeholder="Password", name="password", type="password"),
-                rx.button("Login", type="submit"),
+                # Logo / branding
+                rx.vstack(
+                    rx.box(
+                        rx.icon("layers", size=44, color="white"),
+                        padding="18px",
+                        background="linear-gradient(135deg, #7c3aed, #a855f7)",
+                        border_radius="20px",
+                        box_shadow="0 8px 32px rgba(124,58,237,0.5)",
+                    ),
+                    rx.heading("Turkey.app", size="8", color="white",
+                               style={"letterSpacing": "-0.03em"}),
+                    rx.text(
+                        "Your intelligent media library",
+                        size="4",
+                        color="#a78bfa",
+                    ),
+                    spacing="4",
+                    align="center",
+                ),
+
+                # Login card
+                rx.box(
+                    rx.vstack(
+                        rx.text("Sign in to continue", size="3", color="#c4b5fd", weight="medium"),
+                        rx.divider(color="rgba(124,58,237,0.2)"),
+                        rx.cond(
+                            State.is_authenticated,
+                            rx.vstack(
+                                rx.hstack(
+                                    rx.icon("circle-check", size=20, color="#22c55e"),
+                                    rx.text("You're signed in!", size="3", color="#86efac"),
+                                    spacing="2",
+                                    align="center",
+                                ),
+                                rx.button(
+                                    rx.icon("library-big", size=16),
+                                    "Open Media Library",
+                                    on_click=rx.redirect("/library"),
+                                    size="3",
+                                    background="linear-gradient(135deg, #7c3aed, #a855f7)",
+                                    color="white",
+                                    border_radius="12px",
+                                    cursor="pointer",
+                                    width="100%",
+                                ),
+                                rx.button(
+                                    rx.icon("log-out", size=16),
+                                    "Sign out",
+                                    on_click=State.logout,
+                                    size="2",
+                                    variant="ghost",
+                                    color_scheme="gray",
+                                    width="100%",
+                                    cursor="pointer",
+                                ),
+                                spacing="3",
+                                width="100%",
+                            ),
+                            rx.vstack(
+                                google_login(on_success=State.on_success),
+                                rx.text(
+                                    "JPG & PNG · Up to 1GB storage · Folder export",
+                                    size="1",
+                                    color="#6b7280",
+                                    text_align="center",
+                                ),
+                                spacing="4",
+                                align="center",
+                                width="100%",
+                            ),
+                        ),
+                        spacing="5",
+                        align="center",
+                        width="100%",
+                    ),
+                    padding="36px",
+                    background="rgba(255,255,255,0.05)",
+                    border="1px solid rgba(124,58,237,0.3)",
+                    border_radius="24px",
+                    box_shadow="0 25px 50px rgba(0,0,0,0.5)",
+                    backdrop_filter="blur(20px)",
+                    width="380px",
+                ),
+
+                spacing="8",
+                align="center",
+                justify="center",
+                min_height="100vh",
             ),
-            on_submit=State.login,
+            min_height="100vh",
+            background="radial-gradient(ellipse at top, #130a2e 0%, #0a0515 60%, #050208 100%)",
+            display="flex",
+            align_items="center",
+            justify_content="center",
         ),
-        rx.text("Or"),
-        rx.form( # Signup form for simplicity next to it
-             rx.vstack(
-                rx.input(placeholder="New Email", name="email"),
-                rx.input(placeholder="New Password", name="password", type="password"),
-                rx.button("Register", type="submit"),
-            ),
-            on_submit=State.signup,
-        ),
-        rx.button("Login with Google", on_click=State.start_google_auth),
-        spacing="4",
-        align="center",
-        justify="center",
-        height="100vh",
+        client_id=config.google_client_id,
     )
 
-def image_card(img: Image) -> rx.Component:
-    return rx.card(
-        rx.vstack(
-            rx.image(src="/placeholder.png", height="100px"), # In real app, serve the image
-            rx.text(img.filename, size="2"),
-            rx.text(f"{img.file_size / 1024:.1f} KB", size="1"),
-        )
-    )
 
-def dashboard() -> rx.Component:
-    return rx.vstack(
-        rx.hstack(
-            rx.heading("My Images"),
-            rx.spacer(),
-            rx.text(State.storage_limit_display),
-            rx.button("Logout", on_click=State.logout),
-            width="100%",
-            padding="4",
-            border_bottom="1px solid #ccc"
-        ),
-        rx.vstack(
-            rx.hstack(
-                rx.text("Upload Images:"),
-                rx.upload(
-                    rx.button("Select Images"),
-                    id="upload_images",
-                    multiple=True,
-                    accept={"image/*": [".png", ".jpg", ".jpeg"]},
-                    max_files=10,
-                ),
-                rx.button(
-                    "Upload",
-                    on_click=State.handle_upload(rx.upload_files(upload_id="upload_images")),
-                ),
-            ),
-            rx.hstack(
-                rx.text("Import Folder (Zip):"),
-                rx.upload(
-                    rx.button("Select Zip"),
-                    id="upload_zip",
-                    multiple=False,
-                    accept={".zip": [".zip"]},
-                ),
-                rx.button(
-                    "Import",
-                    on_click=State.handle_import_folder(rx.upload_files(upload_id="upload_zip")),
-                ),
-                 rx.button("Export All", on_click=State.export_folder),
-            ),
-            spacing="4",
-            padding="4",
-            align="start",
-            width="100%"
-        ),
-        rx.grid(
-            rx.foreach(State.images, image_card),
-            columns="4",
-            spacing="4",
-            padding="4",
-            width="100%"
-        ),
-        width="100%",
-    )
-
-def index() -> rx.Component:
+def library_page() -> rx.Component:
+    """Protected wrapper around the import/export page."""
     return rx.cond(
-        State.is_logged_in,
-        dashboard(),
-        login_form(),
+        State.is_authenticated,
+        rx.box(
+            # Top nav bar
+            rx.hstack(
+                rx.hstack(
+                    rx.box(
+                        rx.icon("layers", size=20, color="white"),
+                        padding="8px",
+                        background="linear-gradient(135deg, #7c3aed, #a855f7)",
+                        border_radius="10px",
+                    ),
+                    rx.text("Turkey.app", size="4", weight="bold", color="white"),
+                    spacing="3",
+                    align="center",
+                ),
+                rx.hstack(
+                    rx.cond(
+                        State.user_name != "",
+                        rx.hstack(
+                            rx.icon("circle-user-round", size=18, color="#a78bfa"),
+                            rx.text(State.user_name, size="2", color="#c4b5fd"),
+                            spacing="2",
+                            align="center",
+                        ),
+                        rx.box(),
+                    ),
+                    rx.button(
+                        rx.icon("log-out", size=16),
+                        "Sign out",
+                        on_click=State.logout,
+                        size="2",
+                        variant="ghost",
+                        color_scheme="purple",
+                        cursor="pointer",
+                    ),
+                    spacing="4",
+                    align="center",
+                ),
+                justify="between",
+                align="center",
+                padding="0 32px",
+                height="60px",
+                background="rgba(10,5,21,0.9)",
+                border_bottom="1px solid rgba(124,58,237,0.2)",
+                backdrop_filter="blur(12px)",
+                position="sticky",
+                top="0",
+                z_index="100",
+                width="100%",
+            ),
+            import_export_page(),
+            width="100%",
+        ),
+        # Not authenticated → redirect to login
+        rx.box(
+            rx.vstack(
+                rx.icon("lock", size=48, color="#7c3aed"),
+                rx.heading("Access Restricted", size="6", color="white"),
+                rx.text("Please sign in to access the media library.", size="3", color="#a78bfa"),
+                rx.button(
+                    "Go to Login",
+                    on_click=rx.redirect("/"),
+                    size="3",
+                    background="linear-gradient(135deg, #7c3aed, #a855f7)",
+                    color="white",
+                    border_radius="12px",
+                    cursor="pointer",
+                ),
+                spacing="5",
+                align="center",
+                justify="center",
+                min_height="100vh",
+            ),
+            min_height="100vh",
+            background="radial-gradient(ellipse at top, #130a2e 0%, #0a0515 60%, #050208 100%)",
+            display="flex",
+            align_items="center",
+            justify_content="center",
+        ),
     )
 
-app = rx.App()
-app.add_page(index, on_load=[State.refresh_data, State.check_google_callback])
+
+app = rx.App(
+    theme=rx.theme(
+        appearance="dark",
+        accent_color="violet",
+        radius="medium",
+    ),
+)
+app.add_page(login_page, route="/")
+app.add_page(library_page, route="/library")
