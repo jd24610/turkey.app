@@ -192,7 +192,7 @@ def duplicate_modal() -> rx.Component:
 
 
 def image_card(img: rx.Base) -> rx.Component:
-    """Card for a single image — uses typed ImageData fields."""
+    """Card for a single image — typed ImageData fields + tag badges."""
     return rx.box(
         rx.vstack(
             # Thumbnail placeholder
@@ -229,7 +229,6 @@ def image_card(img: rx.Base) -> rx.Component:
                     rx.box(),
                 ),
                 rx.hstack(
-                    # Use pre-computed typed fields (no Python operators on Vars needed)
                     rx.cond(
                         img.is_large,
                         rx.text(img.size_mb, " MB", size="1", color="#6b7280"),
@@ -246,6 +245,60 @@ def image_card(img: rx.Base) -> rx.Component:
                 spacing="1",
                 align="start",
                 width="100%",
+            ),
+            # Tag assign dropdown
+            rx.select(
+                UploadState.tags.pluck("name"),
+                placeholder="+ Add tag…",
+                on_change=lambda tag_name: UploadState.assign_tag(
+                    img.id,
+                    UploadState.tags.find(lambda t: t.name == tag_name).id,
+                ),
+                size="1",
+                width="100%",
+                background="rgba(255,255,255,0.06)",
+                border="1px solid rgba(124,58,237,0.3)",
+                border_radius="8px",
+                color="#a78bfa",
+            ),
+            # Assigned tag badges
+            rx.cond(
+                img.tag_ids.length() > 0,
+                rx.box(
+                    rx.foreach(
+                        UploadState.filtered_tags,
+                        lambda t: rx.cond(
+                            img.tag_ids.contains(t.id),
+                            rx.hstack(
+                                rx.box(
+                                    width="8px", height="8px",
+                                    border_radius="50%",
+                                    background=t.color,
+                                ),
+                                rx.text(t.name, size="1", color="white"),
+                                rx.icon(
+                                    "x",
+                                    size=10,
+                                    color="#9ca3af",
+                                    cursor="pointer",
+                                    on_click=UploadState.remove_tag(img.id, t.id),
+                                ),
+                                spacing="1",
+                                align="center",
+                                padding="3px 8px",
+                                background="rgba(124,58,237,0.18)",
+                                border_radius="999px",
+                                border="1px solid rgba(124,58,237,0.3)",
+                            ),
+                            rx.box(),
+                        ),
+                    ),
+                    display="flex",
+                    flex_wrap="wrap",
+                    gap="4px",
+                    width="100%",
+                ),
+                rx.box(),
             ),
             # Delete
             rx.button(
@@ -311,6 +364,133 @@ def folder_filter_btn(folder: str) -> rx.Component:
         size="1",
         variant=rx.cond(UploadState.folder_filter == folder, "solid", "ghost"),
         color_scheme="purple",
+    )
+
+
+def tag_filter_btn(tag: rx.Base) -> rx.Component:
+    """Task F: Filter gallery by tag."""
+    return rx.button(
+        rx.hstack(
+            rx.box(width="8px", height="8px", border_radius="50%", background=tag.color),
+            rx.text(tag.name, size="1"),
+            spacing="1",
+            align="center",
+        ),
+        on_click=UploadState.set_tag_filter(tag.id.to_string()),
+        size="1",
+        variant=rx.cond(UploadState.tag_filter == tag.id.to_string(), "solid", "ghost"),
+        color_scheme="purple",
+    )
+
+
+def tag_row(tag: rx.Base) -> rx.Component:
+    """A single tag row in the management panel."""
+    return rx.hstack(
+        rx.box(
+            width="12px", height="12px",
+            border_radius="50%",
+            background=tag.color,
+            flex_shrink="0",
+        ),
+        rx.text(tag.name, size="2", color="white", flex="1"),
+        rx.icon(
+            "trash-2", size=14, color="#ef4444",
+            cursor="pointer",
+            on_click=UploadState.delete_tag(tag.id),
+        ),
+        spacing="2",
+        align="center",
+        width="100%",
+        padding="6px 10px",
+        border_radius="8px",
+        background="rgba(255,255,255,0.03)",
+        border="1px solid rgba(124,58,237,0.15)",
+    )
+
+
+def tag_management_panel() -> rx.Component:
+    """Tasks A/B/C/D/F/G: Tag Management panel."""
+    return rx.box(
+        rx.vstack(
+            rx.hstack(
+                rx.icon("tag", size=18, color="#a78bfa"),
+                rx.text("Tags", size="3", weight="bold", color="white"),
+                spacing="2",
+                align="center",
+            ),
+            # Create tag row
+            rx.hstack(
+                rx.input(
+                    placeholder="New tag name…",
+                    value=UploadState.new_tag_name,
+                    on_change=UploadState.set_new_tag_name,
+                    size="2",
+                    background="rgba(255,255,255,0.06)",
+                    border="1px solid rgba(124,58,237,0.3)",
+                    border_radius="10px",
+                    color="white",
+                    flex="1",
+                ),
+                rx.input(
+                    type="color",
+                    value=UploadState.new_tag_color,
+                    on_change=UploadState.set_new_tag_color,
+                    width="40px",
+                    height="36px",
+                    padding="2px",
+                    border="1px solid rgba(124,58,237,0.3)",
+                    border_radius="8px",
+                    background="transparent",
+                    cursor="pointer",
+                ),
+                rx.button(
+                    rx.icon("plus", size=16),
+                    "Create",
+                    on_click=UploadState.create_tag,
+                    size="2",
+                    background="linear-gradient(135deg, #7c3aed, #a855f7)",
+                    color="white",
+                    border_radius="10px",
+                    cursor="pointer",
+                ),
+                spacing="2",
+                width="100%",
+            ),
+            # Search tags (Task F)
+            rx.input(
+                placeholder="Search tags…",
+                value=UploadState.tag_search,
+                on_change=UploadState.set_tag_search,
+                size="1",
+                background="rgba(255,255,255,0.04)",
+                border="1px solid rgba(124,58,237,0.2)",
+                border_radius="8px",
+                color="white",
+                width="100%",
+            ),
+            # Tag list
+            rx.cond(
+                UploadState.filtered_tags.length() > 0,
+                rx.box(
+                    rx.vstack(
+                        rx.foreach(UploadState.filtered_tags, tag_row),
+                        spacing="2",
+                    ),
+                    max_height="200px",
+                    overflow_y="auto",
+                    width="100%",
+                ),
+                rx.text("No tags yet.", size="2", color="#6b7280", text_align="center"),
+            ),
+            spacing="3",
+            width="100%",
+        ),
+        padding="24px",
+        background="rgba(255,255,255,0.03)",
+        border="1px solid rgba(124,58,237,0.2)",
+        border_radius="20px",
+        width="320px",
+        flex_shrink="0",
     )
 
 
@@ -406,7 +586,7 @@ def import_export_page() -> rx.Component:
 
             rx.divider(color="rgba(124,58,237,0.2)"),
 
-            # ── Upload + Folder Row ──
+                # Upload + Folder + Tags Row
             rx.hstack(
                 # Upload zone
                 rx.box(
@@ -517,6 +697,9 @@ def import_export_page() -> rx.Component:
                     flex_shrink="0",
                 ),
 
+                # Tag management panel
+                tag_management_panel(),
+
                 spacing="5",
                 align="start",
                 width="100%",
@@ -540,6 +723,7 @@ def import_export_page() -> rx.Component:
                             spacing="2",
                             align="center",
                         ),
+                # Folder + Tag filter bar
                         rx.hstack(
                             rx.button(
                                 "All",
@@ -551,6 +735,23 @@ def import_export_page() -> rx.Component:
                             rx.foreach(
                                 UploadState.folders,
                                 folder_filter_btn,
+                            ),
+                            rx.box(
+                                width="1px",
+                                height="20px",
+                                background="rgba(124,58,237,0.3)",
+                            ),
+                            rx.icon("tag", size=14, color="#a78bfa"),
+                            rx.button(
+                                "All tags",
+                                on_click=UploadState.set_tag_filter(""),
+                                size="1",
+                                variant=rx.cond(UploadState.tag_filter == "", "solid", "ghost"),
+                                color_scheme="purple",
+                            ),
+                            rx.foreach(
+                                UploadState.tags,
+                                tag_filter_btn,
                             ),
                             spacing="2",
                             flex_wrap="wrap",

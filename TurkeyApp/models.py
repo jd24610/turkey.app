@@ -40,3 +40,17 @@ class ImageRecord(rx.Model, table=True):
     size_bytes: int = 0
     was_compressed: bool = False
     created_at: str = ""
+
+
+class Tag(rx.Model, table=True):
+    """A user-defined tag for organizing images."""
+    name: str
+    color: str = "#7c3aed"
+    owner_email: str
+    created_at: str = ""
+
+
+class ImageTag(rx.Model, table=True):
+    """Many-to-many association between images and tags."""
+    image_id: int = Field(foreign_key="imagerecord.id")
+    tag_id: int = Field(foreign_key="tag.id")

@@ -7,7 +7,7 @@ import os
 import io
 import base64
 from pydantic import BaseModel
-from TurkeyApp.models import ImageRecord, Folder
+from TurkeyApp.models import ImageRecord, Folder, Tag, ImageTag
 
 # Constants
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024        # 10 MB hard limit
@@ -19,9 +19,18 @@ UPLOAD_DIR = "uploaded_images"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
+class TagData(BaseModel):
+    """Typed tag record for the UI."""
+    id: int = 0
+    name: str = ""
+    color: str = "#7c3aed"
+
+
 class ImageData(BaseModel):
     """Typed image record for the UI."""
     id: int = 0
+    owner_email: str = ""
+
     filename: str = ""
     original_filename: str = ""
     folder_name: str = ""
@@ -32,6 +41,7 @@ class ImageData(BaseModel):
     is_large: bool = False       # size_bytes > 1MB
     was_compressed: bool = False
     created_at: str = ""
+    tag_ids: list[int] = []
 
 
 class UploadState(rx.State):
@@ -53,7 +63,13 @@ class UploadState(rx.State):
     new_folder_name: str = ""
     folder_filter: str = ""
 
-    # ---- Storage ----
+    # ---- Tags ----
+    tags: list[TagData] = []
+    new_tag_name: str = ""
+    new_tag_color: str = "#7c3aed"
+    tag_filter: str = ""        # filter by tag_id string, "" = all
+    tag_search: str = ""        # search tag names
+
     used_storage_bytes: int = 0
 
     # ---- Export ----
@@ -81,18 +97,34 @@ class UploadState(rx.State):
 
     @rx.var
     def filtered_images(self) -> list[ImageData]:
-        if not self.folder_filter:
-            return self.images
-        return [img for img in self.images if img.folder_name == self.folder_filter]
+        imgs = self.images
+        if self.folder_filter:
+            imgs = [img for img in imgs if img.folder_name == self.folder_filter]
+        if self.tag_filter:
+            try:
+                tid = int(self.tag_filter)
+                imgs = [img for img in imgs if tid in img.tag_ids]
+            except ValueError:
+                pass
+        return imgs
 
     @rx.var
     def image_count(self) -> int:
         return len(self.filtered_images)
 
+    @rx.var
+    def filtered_tags(self) -> list[TagData]:
+        """Tags filtered by search query."""
+        if not self.tag_search:
+            return self.tags
+        q = self.tag_search.lower()
+        return [t for t in self.tags if q in t.name.lower()]
+
     # ── Lifecycle ─────────────────────────────
     def on_load(self):
         self._refresh_images()
         self._refresh_folders()
+        self._refresh_tags()
         self._recalc_storage()
 
     def set_selected_folder(self, folder: str):
@@ -104,11 +136,23 @@ class UploadState(rx.State):
     def set_folder_filter(self, folder: str):
         self.folder_filter = folder
 
+    def set_tag_filter(self, tag_id: str):
+        self.tag_filter = tag_id
+
+    def set_tag_search(self, q: str):
+        self.tag_search = q
+
+    def set_new_tag_name(self, name: str):
+        self.new_tag_name = name
+
+    def set_new_tag_color(self, color: str):
+        self.new_tag_color = color
+
     # ── Helpers ───────────────────────────────
     def _owner_email(self) -> str:
         return self.user_email or "anonymous"
 
-    def _make_image_data(self, r: ImageRecord) -> ImageData:
+    def _make_image_data(self, r: ImageRecord, tag_ids: list[int] | None = None) -> ImageData:
         sb = r.size_bytes
         return ImageData(
             id=r.id or 0,
@@ -122,6 +166,7 @@ class UploadState(rx.State):
             is_large=sb > 1024 * 1024,
             was_compressed=r.was_compressed,
             created_at=r.created_at,
+            tag_ids=tag_ids or [],
         )
 
     def _refresh_images(self):
@@ -131,7 +176,15 @@ class UploadState(rx.State):
                     ImageRecord.owner_email == self._owner_email()
                 )
             ).all()
-            self.images = [self._make_image_data(r) for r in records]
+            # Build a map of image_id -> [tag_ids]
+            all_image_tags = session.exec(ImageTag.select()).all()
+            tag_map: dict[int, list[int]] = {}
+            for it in all_image_tags:
+                tag_map.setdefault(it.image_id, []).append(it.tag_id)
+            self.images = [
+                self._make_image_data(r, tag_map.get(r.id or 0, []))
+                for r in records
+            ]
 
     def _refresh_folders(self):
         with rx.session() as session:
@@ -141,6 +194,13 @@ class UploadState(rx.State):
                 )
             ).all()
             self.folders = [r.name for r in records]
+
+    def _refresh_tags(self):
+        with rx.session() as session:
+            records = session.exec(
+                Tag.select().where(Tag.owner_email == self._owner_email())
+            ).all()
+            self.tags = [TagData(id=r.id or 0, name=r.name, color=r.color) for r in records]
 
     def _recalc_storage(self):
         self.used_storage_bytes = sum(img.size_bytes for img in self.images)
@@ -169,24 +229,118 @@ class UploadState(rx.State):
                 created_at=datetime.datetime.now().isoformat(),
             ))
             session.commit()
+            self.folders.append(name) 
+            self.selected_folder = name 
+            
         self.new_folder_name = ""
         self._refresh_folders()
         self.upload_status = "success"
-        self.upload_message = f'✅ Folder "{name}" created!'
+        self.upload_message = f' Folder "{name}" created!'
 
     def delete_image(self, image_id: int):
         with rx.session() as session:
+            # Also remove all tag associations for this image
+            assocs = session.exec(
+                ImageTag.select().where(ImageTag.image_id == image_id)
+            ).all()
+            for a in assocs:
+                session.delete(a)
             record = session.get(ImageRecord, image_id)
             if record:
                 filepath = os.path.join(UPLOAD_DIR, record.filename)
                 if os.path.exists(filepath):
                     os.remove(filepath)
                 session.delete(record)
-                session.commit()
+            session.commit()
         self._refresh_images()
         self._recalc_storage()
         self.upload_status = "success"
         self.upload_message = "🗑️ Image deleted."
+
+    # ── Tag actions ───────────────────────────
+    def set_new_tag_name(self, name: str):
+        self.new_tag_name = name
+
+    def set_new_tag_color(self, color: str):
+        self.new_tag_color = color
+
+    def set_tag_filter(self, tag_id: str):
+        self.tag_filter = tag_id
+
+    def set_tag_search(self, q: str):
+        self.tag_search = q
+
+    def create_tag(self):
+        """Task B: Create a new tag."""
+        name = self.new_tag_name.strip()
+        if not name:
+            self.upload_status = "error"
+            self.upload_message = "Tag name cannot be empty."
+            return
+        if any(t.name.lower() == name.lower() for t in self.tags):
+            self.upload_status = "error"
+            self.upload_message = f'Tag "{name}" already exists.'
+            return
+        with rx.session() as session:
+            session.add(Tag(
+                name=name,
+                color=self.new_tag_color,
+                owner_email=self._owner_email(),
+                created_at=datetime.datetime.now().isoformat(),
+            ))
+            session.commit()
+        self.new_tag_name = ""
+        self.new_tag_color = "#7c3aed"
+        self._refresh_tags()
+        self.upload_status = "success"
+        self.upload_message = f'🏷️ Tag "{name}" created!'
+
+    def delete_tag(self, tag_id: int):
+        """Task G: Delete a tag and all its assignments."""
+        with rx.session() as session:
+            assocs = session.exec(
+                ImageTag.select().where(ImageTag.tag_id == tag_id)
+            ).all()
+            for a in assocs:
+                session.delete(a)
+            tag = session.get(Tag, tag_id)
+            if tag:
+                session.delete(tag)
+            session.commit()
+        self._refresh_tags()
+        self._refresh_images()
+        if self.tag_filter == str(tag_id):
+            self.tag_filter = ""
+        self.upload_status = "success"
+        self.upload_message = "🗑️ Tag deleted."
+
+    def assign_tag(self, image_id: int, tag_id: int):
+        """Task C: Assign a tag to an image."""
+        with rx.session() as session:
+            existing = session.exec(
+                ImageTag.select().where(
+                    ImageTag.image_id == image_id,
+                    ImageTag.tag_id == tag_id,
+                )
+            ).first()
+            if not existing:
+                session.add(ImageTag(image_id=image_id, tag_id=tag_id))
+                session.commit()
+        self._refresh_images()
+
+    def remove_tag(self, image_id: int, tag_id: int):
+        """Task D: Remove a tag from an image."""
+        with rx.session() as session:
+            assoc = session.exec(
+                ImageTag.select().where(
+                    ImageTag.image_id == image_id,
+                    ImageTag.tag_id == tag_id,
+                )
+            ).first()
+            if assoc:
+                session.delete(assoc)
+                session.commit()
+        self._refresh_images()
 
     # ── Upload ─────────────────────────────────
     async def handle_upload(self, files: list[rx.UploadFile]):
