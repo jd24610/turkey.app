@@ -14,7 +14,7 @@ MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024        # 10 MB hard limit
 COMPRESS_THRESHOLD_BYTES = 10 * 1024 * 1024   # start compressing at 10 MB
 COMPRESS_MAX_BYTES = 20 * 1024 * 1024         # up to 20 MB gets auto-compressed
 STORAGE_QUOTA_BYTES = 1 * 1024 * 1024 * 1024  # 1 GB quota
-UPLOAD_DIR = "uploaded_images"
+UPLOAD_DIR = "uploaded_files"
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -42,6 +42,8 @@ class ImageData(BaseModel):
     was_compressed: bool = False
     created_at: str = ""
     tag_ids: list[int] = []
+    is_public: bool = False      # shared on public profile & feed
+    caption: str = ""            # optional public caption
 
 
 class UploadState(rx.State):
@@ -51,10 +53,11 @@ class UploadState(rx.State):
     user_email: str = ""
     user_name: str = ""
 
-    # ---- Upload feedback ----
-    upload_status: str = ""
+    # ---- Upload feedback / toast ----
+    upload_status: str = ""   # "success" | "warning" | "error"
     upload_message: str = ""
     is_uploading: bool = False
+    toast_visible: bool = False
 
     # ---- Data ----
     images: list[ImageData] = []
@@ -79,6 +82,35 @@ class UploadState(rx.State):
     pending_duplicates: list[str] = []
     show_duplicate_modal: bool = False
     pending_upload_data: list[dict] = []
+
+    # ---- Image preview (lightbox) ----
+    preview_filename: str = ""
+    show_preview: bool = False
+    preview_index: int = -1
+    lightbox_editing_caption: bool = False
+    lightbox_caption_draft: str = ""
+
+    # ---- Gallery controls ----
+    search_query: str = ""
+    sort_by: str = "Newest first"
+    view_mode: str = "grid"  # "grid" | "list"
+
+    # ---- Rename folder ----
+    renaming_folder: str = ""
+    rename_folder_input: str = ""
+
+    # ---- Bulk selection ----
+    selected_image_ids: list[int] = []
+    selection_mode: bool = False
+
+    # ---- User preferences ----
+    settings_open: bool = False
+    bg_theme: str = "#080514"        # background color
+    accent_hex: str = "#7c3aed"      # primary accent color
+    accent_light: str = "#a855f7"    # lighter accent (for text highlights)
+    card_size: str = "medium"        # "small" | "medium" | "large"
+    show_stats_bar: bool = True      # toggle the live stats row
+
 
     # ── Computed ──────────────────────────────
     @rx.var
@@ -106,6 +138,19 @@ class UploadState(rx.State):
                 imgs = [img for img in imgs if tid in img.tag_ids]
             except ValueError:
                 pass
+        if self.search_query:
+            q = self.search_query.lower()
+            imgs = [img for img in imgs if q in img.original_filename.lower()]
+        if self.sort_by == "Newest first":
+            imgs = sorted(imgs, key=lambda x: x.created_at, reverse=True)
+        elif self.sort_by == "Oldest first":
+            imgs = sorted(imgs, key=lambda x: x.created_at)
+        elif self.sort_by == "A → Z":
+            imgs = sorted(imgs, key=lambda x: x.original_filename.lower())
+        elif self.sort_by == "Z → A":
+            imgs = sorted(imgs, key=lambda x: x.original_filename.lower(), reverse=True)
+        elif self.sort_by == "Largest first":
+            imgs = sorted(imgs, key=lambda x: x.size_bytes, reverse=True)
         return imgs
 
     @rx.var
@@ -120,12 +165,131 @@ class UploadState(rx.State):
         q = self.tag_search.lower()
         return [t for t in self.tags if q in t.name.lower()]
 
+    @rx.var
+    def tag_names(self) -> list[str]:
+        """Plain list of tag names for use in rx.select."""
+        return [t.name for t in self.tags]
+
+    @rx.var
+    def tag_name_to_id(self) -> dict[str, int]:
+        """Map tag name → tag id for assign_tag_by_name lookup."""
+        return {t.name: t.id for t in self.tags}
+
+    @rx.var
+    def folders_with_none(self) -> list[str]:
+        """Folder list with '(No folder)' sentinel for the move-to dropdown."""
+        return ["(No folder)"] + self.folders
+
+    @rx.var
+    def folder_image_counts(self) -> dict[str, int]:
+        """Images-per-folder counts for badge display."""
+        counts: dict[str, int] = {f: 0 for f in self.folders}
+        for img in self.images:
+            if img.folder_name and img.folder_name in counts:
+                counts[img.folder_name] = counts[img.folder_name] + 1
+        return counts
+
+    @rx.var
+    def total_images(self) -> int:
+        """Total images across all filters."""
+        return len(self.images)
+
+    @rx.var
+    def folder_count(self) -> int:
+        return len(self.folders)
+
+    @rx.var
+    def tag_count(self) -> int:
+        return len(self.tags)
+
+    @rx.var
+    def bulk_count(self) -> int:
+        return len(self.selected_image_ids)
+
+    # ── Lightbox computed vars ─────────────────
+    @rx.var
+    def preview_has_prev(self) -> bool:
+        return self.preview_index > 0
+
+    @rx.var
+    def preview_has_next(self) -> bool:
+        return self.preview_index < len(self.filtered_images) - 1
+
+    @rx.var
+    def lightbox_name(self) -> str:
+        imgs = self.filtered_images
+        if 0 <= self.preview_index < len(imgs):
+            return imgs[self.preview_index].original_filename
+        return self.preview_filename
+
+    @rx.var
+    def lightbox_size(self) -> str:
+        imgs = self.filtered_images
+        if 0 <= self.preview_index < len(imgs):
+            img = imgs[self.preview_index]
+            if img.size_mb >= 1:
+                return f"{img.size_mb} MB"
+            return f"{int(img.size_kb)} KB"
+        return ""
+
+    @rx.var
+    def lightbox_date(self) -> str:
+        imgs = self.filtered_images
+        if 0 <= self.preview_index < len(imgs):
+            raw = imgs[self.preview_index].created_at
+            # raw is ISO-like string: take first 10 chars (YYYY-MM-DD)
+            return raw[:10] if raw else ""
+        return ""
+
+    @rx.var
+    def lightbox_folder(self) -> str:
+        imgs = self.filtered_images
+        if 0 <= self.preview_index < len(imgs):
+            return imgs[self.preview_index].folder_name or "—"
+        return "—"
+
+    @rx.var
+    def lightbox_tag_count(self) -> int:
+        imgs = self.filtered_images
+        if 0 <= self.preview_index < len(imgs):
+            return len(imgs[self.preview_index].tag_ids)
+        return 0
+
+    @rx.var
+    def lightbox_counter(self) -> str:
+        """e.g. '3 / 12'"""
+        total = len(self.filtered_images)
+        if total == 0:
+            return ""
+        idx = self.preview_index + 1
+        return f"{idx} / {total}"
+
+    @rx.var
+    def lightbox_is_public(self) -> bool:
+        imgs = self.filtered_images
+        if 0 <= self.preview_index < len(imgs):
+            return imgs[self.preview_index].is_public
+        return False
+
+    @rx.var
+    def lightbox_caption(self) -> str:
+        imgs = self.filtered_images
+        if 0 <= self.preview_index < len(imgs):
+            return imgs[self.preview_index].caption
+        return ""
+
     # ── Lifecycle ─────────────────────────────
     def on_load(self):
         self._refresh_images()
         self._refresh_folders()
         self._refresh_tags()
         self._recalc_storage()
+
+    def set_user_email(self, email: str):
+        self.user_email = email
+
+    def set_user_name(self, name: str):
+        self.user_name = name
 
     def set_selected_folder(self, folder: str):
         self.selected_folder = folder
@@ -148,6 +312,276 @@ class UploadState(rx.State):
     def set_new_tag_color(self, color: str):
         self.new_tag_color = color
 
+    def assign_tag_by_name(self, image_id: int, tag_name: str):
+        """Assign a tag to an image using its name (for use with rx.select)."""
+        tag_id = self.tag_name_to_id.get(tag_name)
+        if tag_id is not None:
+            self.assign_tag(image_id, tag_id)
+
+    def open_preview(self, filename: str):
+        """Open the lightbox preview for a given image filename."""
+        self.preview_filename = filename
+        self.show_preview = True
+
+    def close_preview(self):
+        """Close the lightbox preview."""
+        self.show_preview = False
+        self.preview_filename = ""
+        self.preview_index = -1
+
+    def prev_image(self):
+        """Navigate to the previous image in lightbox."""
+        if self.preview_index > 0:
+            self.preview_index -= 1
+            self.preview_filename = self.filtered_images[self.preview_index].filename
+
+    def next_image(self):
+        """Navigate to the next image in lightbox."""
+        if self.preview_index < len(self.filtered_images) - 1:
+            self.preview_index += 1
+            self.preview_filename = self.filtered_images[self.preview_index].filename
+
+    def toggle_image_public(self, image_id: int):
+        """Flip is_public for a single image."""
+        with rx.session() as session:
+            rec = session.get(ImageRecord, image_id)
+            if rec:
+                rec.is_public = not rec.is_public
+                session.add(rec)
+                session.commit()
+        self._refresh_images()
+
+    def set_image_caption(self, image_id: int, caption: str):
+        """Save a caption for a single image."""
+        with rx.session() as session:
+            rec = session.get(ImageRecord, image_id)
+            if rec:
+                rec.caption = caption.strip()
+                session.add(rec)
+                session.commit()
+        self._refresh_images()
+
+    def toggle_lightbox_public(self):
+        """Toggle is_public for the image currently open in the lightbox."""
+        imgs = self.filtered_images
+        if 0 <= self.preview_index < len(imgs):
+            self.toggle_image_public(imgs[self.preview_index].id)
+
+    def start_edit_caption(self):
+        """Enter inline caption edit mode for the current lightbox image."""
+        imgs = self.filtered_images
+        if 0 <= self.preview_index < len(imgs):
+            self.lightbox_caption_draft = imgs[self.preview_index].caption
+            self.lightbox_editing_caption = True
+
+    def set_lightbox_caption_draft(self, val: str):
+        self.lightbox_caption_draft = val
+
+    def cancel_edit_caption(self):
+        self.lightbox_editing_caption = False
+        self.lightbox_caption_draft = ""
+
+    def save_lightbox_caption(self):
+        """Save the draft caption to the DB."""
+        imgs = self.filtered_images
+        if 0 <= self.preview_index < len(imgs):
+            self.set_image_caption(imgs[self.preview_index].id, self.lightbox_caption_draft)
+        self.lightbox_editing_caption = False
+        self.lightbox_caption_draft = ""
+
+    def dismiss_toast(self):
+        """Clear the toast notification."""
+        self.toast_visible = False
+        self.upload_message = ""
+        self.upload_status = ""
+
+
+    def set_search_query(self, q: str):
+        self.search_query = q
+
+    def set_sort_by(self, sort: str):
+        self.sort_by = sort
+
+    def set_view_mode(self, mode: str):
+        self.view_mode = mode
+
+    def assign_folder(self, image_id: int, folder_name: str):
+        """Move an image to a different (or no) folder."""
+        actual = "" if folder_name == "(No folder)" else folder_name
+        with rx.session() as session:
+            record = session.get(ImageRecord, image_id)
+            if record:
+                record.folder_name = actual
+                session.add(record)
+                session.commit()
+        self._refresh_images()
+        self.upload_status = "success"
+        self.upload_message = (
+            f'📁 Moved to "{actual}"!' if actual else "📁 Removed from folder."
+        )
+        self.toast_visible = True
+
+    # ── Rename folder ─────────────────────────
+    def set_rename_folder_input(self, val: str):
+        self.rename_folder_input = val
+
+    def start_rename_folder(self, folder_name: str):
+        self.renaming_folder = folder_name
+        self.rename_folder_input = folder_name
+
+    def cancel_rename_folder(self):
+        self.renaming_folder = ""
+        self.rename_folder_input = ""
+
+    def confirm_rename_folder(self):
+        old = self.renaming_folder
+        new = self.rename_folder_input.strip()
+        if not new or new == old:
+            self.renaming_folder = ""
+            self.rename_folder_input = ""
+            return
+        if new in self.folders:
+            self.upload_status = "error"
+            self.upload_message = f'Folder "{new}" already exists.'
+            self.toast_visible = True
+            return
+        with rx.session() as session:
+            folder_rec = session.exec(
+                Folder.select().where(
+                    Folder.name == old,
+                    Folder.owner_email == self._owner_email(),
+                )
+            ).first()
+            if folder_rec:
+                folder_rec.name = new
+                session.add(folder_rec)
+            records = session.exec(
+                ImageRecord.select().where(
+                    ImageRecord.folder_name == old,
+                    ImageRecord.owner_email == self._owner_email(),
+                )
+            ).all()
+            for r in records:
+                r.folder_name = new
+                session.add(r)
+            session.commit()
+        if self.folder_filter == old:
+            self.folder_filter = new
+        self.renaming_folder = ""
+        self.rename_folder_input = ""
+        self._refresh_folders()
+        self._refresh_images()
+        self.upload_status = "success"
+        self.upload_message = f'✏️ Folder renamed to "{new}"!'
+        self.toast_visible = True
+
+    # ── Bulk selection ─────────────────────────
+    def toggle_selection_mode(self):
+        self.selection_mode = not self.selection_mode
+        self.selected_image_ids = []
+
+    def on_image_click(self, image_id: int, filename: str):
+        """Route click to selection toggle or lightbox (with index) depending on mode."""
+        if self.selection_mode:
+            if image_id in self.selected_image_ids:
+                self.selected_image_ids = [
+                    i for i in self.selected_image_ids if i != image_id
+                ]
+            else:
+                self.selected_image_ids = self.selected_image_ids + [image_id]
+        else:
+            # Find position in the filtered list so lightbox nav works
+            self.preview_index = next(
+                (i for i, img in enumerate(self.filtered_images) if img.id == image_id),
+                -1,
+            )
+            self.open_preview(filename)
+
+    def select_all(self):
+        self.selected_image_ids = [img.id for img in self.filtered_images]
+
+    def clear_selection(self):
+        self.selected_image_ids = []
+
+    def bulk_delete(self):
+        ids = list(self.selected_image_ids)
+        for image_id in ids:
+            with rx.session() as session:
+                assocs = session.exec(
+                    ImageTag.select().where(ImageTag.image_id == image_id)
+                ).all()
+                for a in assocs:
+                    session.delete(a)
+                record = session.get(ImageRecord, image_id)
+                if record:
+                    fp = os.path.join(UPLOAD_DIR, record.filename)
+                    if os.path.exists(fp):
+                        os.remove(fp)
+                    session.delete(record)
+                session.commit()
+        count = len(ids)
+        self.selected_image_ids = []
+        self.selection_mode = False
+        self._refresh_images()
+        self._recalc_storage()
+        self.upload_status = "success"
+        self.upload_message = f"🗑️ {count} image(s) deleted."
+        self.toast_visible = True
+
+    def bulk_move(self, folder_name: str):
+        actual = "" if folder_name == "(No folder)" else folder_name
+        with rx.session() as session:
+            for image_id in self.selected_image_ids:
+                record = session.get(ImageRecord, image_id)
+                if record:
+                    record.folder_name = actual
+                    session.add(record)
+            session.commit()
+        count = len(self.selected_image_ids)
+        self.selected_image_ids = []
+        self.selection_mode = False
+        self._refresh_images()
+        dest = f'"{actual}"' if actual else "no folder"
+        self.upload_status = "success"
+        self.upload_message = f"📁 {count} image(s) moved to {dest}."
+        self.toast_visible = True
+
+    # ── User preferences ──────────────────────
+    def toggle_settings(self):
+        self.settings_open = not self.settings_open
+
+    def close_settings(self):
+        self.settings_open = False
+
+    def set_bg_theme(self, gradient: str):
+        self.bg_theme = gradient
+
+    def set_accent(self, main: str, light: str):
+        self.accent_hex = main
+        self.accent_light = light
+
+    def set_card_size(self, size: str):
+        self.card_size = size
+
+    def toggle_stats_bar(self):
+        self.show_stats_bar = not self.show_stats_bar
+
+    @rx.var
+    def card_width(self) -> str:
+        if self.card_size == "small":
+            return "155px"
+        elif self.card_size == "large":
+            return "260px"
+        return "200px"
+
+    @rx.var
+    def thumb_height(self) -> str:
+        if self.card_size == "small":
+            return "110px"
+        elif self.card_size == "large":
+            return "175px"
+        return "140px"
+
     # ── Helpers ───────────────────────────────
     def _owner_email(self) -> str:
         return self.user_email or "anonymous"
@@ -167,6 +601,8 @@ class UploadState(rx.State):
             was_compressed=r.was_compressed,
             created_at=r.created_at,
             tag_ids=tag_ids or [],
+            is_public=r.is_public,
+            caption=r.caption,
         )
 
     def _refresh_images(self):
@@ -217,10 +653,12 @@ class UploadState(rx.State):
         if not name:
             self.upload_status = "error"
             self.upload_message = "Folder name cannot be empty."
+            self.toast_visible = True
             return
         if name in self.folders:
             self.upload_status = "error"
             self.upload_message = f'Folder "{name}" already exists.'
+            self.toast_visible = True
             return
         with rx.session() as session:
             session.add(Folder(
@@ -236,6 +674,36 @@ class UploadState(rx.State):
         self._refresh_folders()
         self.upload_status = "success"
         self.upload_message = f' Folder "{name}" created!'
+        self.toast_visible = True
+
+    def delete_folder(self, folder_name: str):
+        """Delete a folder, moving its images back to 'no folder'."""
+        with rx.session() as session:
+            records = session.exec(
+                ImageRecord.select().where(
+                    ImageRecord.folder_name == folder_name,
+                    ImageRecord.owner_email == self._owner_email(),
+                )
+            ).all()
+            for r in records:
+                r.folder_name = ""
+                session.add(r)
+            folder_rec = session.exec(
+                Folder.select().where(
+                    Folder.name == folder_name,
+                    Folder.owner_email == self._owner_email(),
+                )
+            ).first()
+            if folder_rec:
+                session.delete(folder_rec)
+            session.commit()
+        if self.folder_filter == folder_name:
+            self.folder_filter = ""
+        self._refresh_folders()
+        self._refresh_images()
+        self.upload_status = "success"
+        self.upload_message = f'🗑️ Folder "{folder_name}" deleted.'
+        self.toast_visible = True
 
     def delete_image(self, image_id: int):
         with rx.session() as session:
@@ -256,6 +724,7 @@ class UploadState(rx.State):
         self._recalc_storage()
         self.upload_status = "success"
         self.upload_message = "🗑️ Image deleted."
+        self.toast_visible = True
 
     # ── Tag actions ───────────────────────────
     def set_new_tag_name(self, name: str):
@@ -276,10 +745,12 @@ class UploadState(rx.State):
         if not name:
             self.upload_status = "error"
             self.upload_message = "Tag name cannot be empty."
+            self.toast_visible = True
             return
         if any(t.name.lower() == name.lower() for t in self.tags):
             self.upload_status = "error"
             self.upload_message = f'Tag "{name}" already exists.'
+            self.toast_visible = True
             return
         with rx.session() as session:
             session.add(Tag(
@@ -294,6 +765,7 @@ class UploadState(rx.State):
         self._refresh_tags()
         self.upload_status = "success"
         self.upload_message = f'🏷️ Tag "{name}" created!'
+        self.toast_visible = True
 
     def delete_tag(self, tag_id: int):
         """Task G: Delete a tag and all its assignments."""
@@ -313,6 +785,7 @@ class UploadState(rx.State):
             self.tag_filter = ""
         self.upload_status = "success"
         self.upload_message = "🗑️ Tag deleted."
+        self.toast_visible = True
 
     def assign_tag(self, image_id: int, tag_id: int):
         """Task C: Assign a tag to an image."""
@@ -422,6 +895,7 @@ class UploadState(rx.State):
         if parts:
             self.upload_status = "error" if (errors and not successes) else "success"
             self.upload_message = " ".join(parts)
+            self.toast_visible = True
 
         self._refresh_images()
         self._recalc_storage()
@@ -449,12 +923,14 @@ class UploadState(rx.State):
         self._recalc_storage()
         self.upload_status = "success"
         self.upload_message = "✅ Duplicates overwritten!"
+        self.toast_visible = True
 
     def cancel_duplicate_upload(self):
         self.show_duplicate_modal = False
         self.pending_upload_data = []
         self.pending_duplicates = []
         self.upload_message = "⚠️ Duplicate images were skipped."
+        self.toast_visible = True
         self.upload_status = "warning"
 
     def _compress_image(self, data: bytes) -> tuple[bytes, str]:
@@ -485,20 +961,28 @@ class UploadState(rx.State):
             ))
             session.commit()
 
-    # ── Export ────────────────────────────────
+    # ── Export ────────────────────────────────────────
     def export_folder(self, folder_name: str):
+        """Bundle all images in a folder into a ZIP and trigger a browser download."""
+        import zipfile as _zip
         to_export = [img for img in self.images if img.folder_name == folder_name]
         if not to_export:
             self.export_status = f'No images in folder "{folder_name}".'
             return
-        manifest = {
-            "folder": folder_name,
-            "owner": self._owner_email(),
-            "exported_at": datetime.datetime.now().isoformat(),
-            "images": [img.dict() for img in to_export],
-        }
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        export_path = os.path.join(UPLOAD_DIR, f"export_{folder_name}_{ts}.json")
-        with open(export_path, "w") as f:
-            json.dump(manifest, f, indent=2)
-        self.export_status = f'✅ "{folder_name}" exported → {export_path}'
+        safe = folder_name.replace(" ", "_")
+        zip_filename = f"export_{safe}_{ts}.zip"
+        zip_path = os.path.join(UPLOAD_DIR, zip_filename)
+        try:
+            with _zip.ZipFile(zip_path, "w", _zip.ZIP_DEFLATED) as zf:
+                for img in to_export:
+                    fp = os.path.join(UPLOAD_DIR, img.filename)
+                    if os.path.exists(fp):
+                        zf.write(fp, img.original_filename)
+            self.export_status = f'✅ {len(to_export)} image(s) zipped — downloading…'
+            return rx.download(
+                url=rx.get_upload_url(zip_filename),
+                filename=f"{folder_name}.zip",
+            )
+        except Exception as e:
+            self.export_status = f'❌ Export failed: {e}'

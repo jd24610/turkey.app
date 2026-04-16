@@ -40,6 +40,8 @@ class ImageRecord(rx.Model, table=True):
     size_bytes: int = 0
     was_compressed: bool = False
     created_at: str = ""
+    is_public: bool = False   # whether image appears on public profile & feed
+    caption: str = ""         # optional caption shown on public profile
 
 
 class Tag(rx.Model, table=True):
@@ -54,3 +56,25 @@ class ImageTag(rx.Model, table=True):
     """Many-to-many association between images and tags."""
     image_id: int = Field(foreign_key="imagerecord.id")
     tag_id: int = Field(foreign_key="tag.id")
+
+
+class UserProfile(rx.Model, table=True):
+    """Extended user profile collected during onboarding."""
+    email: str = Field(unique=True, index=True)    # FK to Google OAuth email
+    username: str = Field(unique=True, index=True) # @handle, URL-safe
+    display_name: str = ""
+    bio: str = ""
+    date_of_birth: str = ""     # YYYY-MM-DD string
+    avatar_filename: str = ""   # uploaded avatar via storage system
+    location: str = ""
+    website: str = ""
+    is_public: bool = True
+    created_at: str = ""
+    onboarding_complete: bool = False
+
+
+class Follow(rx.Model, table=True):
+    """Follower -> Following relationship."""
+    follower_email: str = Field(index=True)   # the person who clicked Follow
+    following_email: str = Field(index=True)  # the person being followed
+    created_at: str = ""
