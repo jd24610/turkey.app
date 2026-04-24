@@ -1,0 +1,18 @@
+stages:
+  - deploy
+
+deploy-reflex:
+  stage: deploy
+  image: python:3.12-slim-bookworm
+  before_script:
+    - apt-get update && apt-get install -y git curl
+    - curl -LsSf https://astral.sh/uv/install.sh | sh
+    - export PATH="$HOME/.cargo/bin:$PATH"
+    - uv sync
+  script:
+    - source .venv/bin/activate
+    - reflex deploy --project turkey-app
+  only:
+    - main
+  variables:
+    REFLEX_TOKEN: $REFLEX_TOKEN

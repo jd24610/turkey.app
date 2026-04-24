@@ -27,7 +27,9 @@ class Folder(rx.Model, table=True):
     """A folder that groups images."""
     name: str
     owner_email: str
-    created_at: str = ""
+    description: Optional[str] = Field(default=None)
+    is_public: bool = False
+    created_at: Optional[str] = Field(default=None)
 
 
 class ImageRecord(rx.Model, table=True):
@@ -39,9 +41,9 @@ class ImageRecord(rx.Model, table=True):
     mime_type: str = "image/jpeg"
     size_bytes: int = 0
     was_compressed: bool = False
-    created_at: str = ""
-    is_public: bool = False   # whether image appears on public profile & feed
-    caption: str = ""         # optional caption shown on public profile
+    created_at: Optional[str] = Field(default=None)
+    is_public: bool = Field(default=False)
+    caption: Optional[str] = Field(default=None)
 
 
 class Tag(rx.Model, table=True):
@@ -49,7 +51,7 @@ class Tag(rx.Model, table=True):
     name: str
     color: str = "#7c3aed"
     owner_email: str
-    created_at: str = ""
+    created_at: Optional[str] = Field(default=None)
 
 
 class ImageTag(rx.Model, table=True):
@@ -66,10 +68,11 @@ class UserProfile(rx.Model, table=True):
     bio: str = ""
     date_of_birth: str = ""     # YYYY-MM-DD string
     avatar_filename: str = ""   # uploaded avatar via storage system
+    banner_filename: str = ""   # custom profile banner
     location: str = ""
     website: str = ""
     is_public: bool = True
-    created_at: str = ""
+    created_at: Optional[str] = Field(default=None)
     onboarding_complete: bool = False
 
 
@@ -77,4 +80,32 @@ class Follow(rx.Model, table=True):
     """Follower -> Following relationship."""
     follower_email: str = Field(index=True)   # the person who clicked Follow
     following_email: str = Field(index=True)  # the person being followed
-    created_at: str = ""
+    status: str = "accepted"                  # "pending" | "accepted"
+    created_at: Optional[str] = Field(default=None)
+
+
+class Notification(rx.Model, table=True):
+    """General notification system."""
+    to_email: str = Field(index=True)
+    from_email: str = ""
+    from_username: str = ""
+    type: str = "follow_request"              # "follow_request" | "alert" | "comment" | "like"
+    status: str = "unread"                    # "unread" | "read" | "accepted" | "declined"
+    message: str = ""
+    created_at: Optional[str] = Field(default=None)
+
+
+class Like(rx.Model, table=True):
+    """A heart/like on a public image."""
+    liker_email: str = Field(index=True)
+    image_id: int = Field(index=True)
+    created_at: Optional[str] = Field(default=None)
+
+
+class Comment(rx.Model, table=True):
+    """A text comment on a public image."""
+    image_id: int = Field(index=True)
+    author_email: str = Field(index=True)
+    author_username: str = ""
+    text: str
+    created_at: Optional[str] = Field(default=None)

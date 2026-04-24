@@ -8,9 +8,9 @@ import sqlmodel
 from datetime import datetime
 from pydantic import BaseModel
 
-from TurkeyApp.models import UserProfile, ImageRecord, Follow
+from TurkeyApp.models import UserProfile, ImageRecord, Follow, Like, Notification, Comment
 
-AVATAR_DIR = os.path.join("uploaded_files", "avatars")
+AVATAR_DIR = os.path.join("assets", "uploaded_files", "avatars")
 os.makedirs(AVATAR_DIR, exist_ok=True)
 
 
@@ -24,10 +24,12 @@ class SearchResult(BaseModel):
     display_name: str = ""
     bio: str = ""
     location: str = ""
-    avatar_url: str = ""    # full upload path e.g. "avatars/abc123.jpg"
+    avatar_url: str = ""    # "avatars/abc123.jpg"
+    full_avatar_url: str = ""
     member_since: str = ""
     image_count: int = 0
     image_count_str: str = "0"
+    follower_count: int = 0
 
 
 # ─────────────────────────────────────────────
@@ -50,6 +52,7 @@ class ProfileState(rx.State):
     own_website: str = ""
     own_is_public: bool = True
     own_avatar: str = ""
+    own_initials: str = ""
     own_member_since: str = ""
     own_image_count: int = 0
 
@@ -89,7 +92,11 @@ class ProfileState(rx.State):
     viewed_email: str = ""        # needed for follow operations
     viewed_follower_count: int = 0
     viewed_following_count: int = 0
-    viewer_is_following: bool = False   # does the logged-in user follow this profile?
+    
+    # ── Viewed Collections ────────────────────
+    active_profile_tab: str = "all"   # "all" | "collections"
+    viewed_collections: list[dict] = []
+    viewed_active_folder: str = ""
 
     # ── Edit profile modal ───────────────────
     show_edit_profile: bool = False
@@ -104,9 +111,18 @@ class ProfileState(rx.State):
     edit_save_error: str = ""
     edit_save_success: bool = False
 
-    # ── Avatar upload ─────────────────────────
+    # ── Viewed Stats ──────────────────────────
+    viewed_total_likes: int = 0
+    viewed_banner: str = ""
+
+    # ── Avatar/Banner upload ──────────────────
     avatar_uploading: bool = False
     avatar_error: str = ""
+    banner_uploading: bool = False
+    banner_error: str = ""
+
+    # ── Own data expansion ────────────────────
+    own_banner: str = ""
 
     # ── Search / discovery ───────────────────
     search_query: str = ""
@@ -114,15 +130,32 @@ class ProfileState(rx.State):
     search_loading: bool = False
     search_done: bool = False
 
-    # ── Computed ──────────────────────────────
-    @rx.var
-    def own_initials(self) -> str:
-        name = self.own_display_name or self.own_username
-        parts = name.split()
-        if len(parts) >= 2:
-            return (parts[0][0] + parts[-1][0]).upper()
-        return name[:2].upper() if name else "??"
+    # ── Public profile image lightbox ─────────
+    show_viewed_lightbox: bool = False
+    viewed_lightbox_filename: str = ""
+    viewed_lightbox_caption: str = ""
+    viewed_lightbox_index: int = -1
+    viewed_lightbox_image_id: int = 0
+    viewed_lightbox_like_count: int = 0
+    viewed_lightbox_viewer_has_liked: bool = False
+    viewed_lightbox_comments: list[dict] = []
+    comment_input: str = ""
+    comment_loading: bool = False
 
+    # ── Notifications ────────────────────────
+    notifications: list[Notification] = []
+    unread_notifications_count: int = 0
+    show_notifications_dropdown: bool = False
+
+    # ── Suggested Creators ──────────────────
+    suggested_creators: list[SearchResult] = []
+    suggested_loading: bool = False
+
+    # ── Profile toast ────────────────────────
+    profile_toast_visible: bool = False
+    profile_toast_message: str = ""
+
+    # ── Computed ──────────────────────────────
     @rx.var
     def viewed_initials(self) -> str:
         name = self.viewed_display_name or self.viewed_username
@@ -130,6 +163,36 @@ class ProfileState(rx.State):
         if len(parts) >= 2:
             return (parts[0][0] + parts[-1][0]).upper()
         return name[:2].upper() if name else "??"
+
+    @rx.var
+    def viewer_is_following(self) -> bool:
+        """True if the viewer follows the viewed profile (Accepted)."""
+        if not self.own_email or not self.viewed_email: return False
+        if self.own_email == self.viewed_email: return False
+        with rx.session() as session:
+            f = session.exec(
+                sqlmodel.select(Follow).where(
+                    Follow.follower_email == self.own_email,
+                    Follow.following_email == self.viewed_email,
+                    Follow.status == "accepted"
+                )
+            ).first()
+            return f is not None
+
+    @rx.var
+    def viewer_follow_pending(self) -> bool:
+        """True if there is a pending follow request."""
+        if not self.own_email or not self.viewed_email: return False
+        if self.own_email == self.viewed_email: return False
+        with rx.session() as session:
+            f = session.exec(
+                sqlmodel.select(Follow).where(
+                    Follow.follower_email == self.own_email,
+                    Follow.following_email == self.viewed_email,
+                    Follow.status == "pending"
+                )
+            ).first()
+            return f is not None
 
     @rx.var
     def username_ok(self) -> bool:
@@ -141,6 +204,8 @@ class ProfileState(rx.State):
             return "Create your identity"
         if self.onboarding_step == 2:
             return "Tell us about yourself"
+        if self.onboarding_step == 3:
+            return "Personalize your profile"
         return "Privacy & finish"
 
     @rx.var
@@ -149,19 +214,50 @@ class ProfileState(rx.State):
             return "Choose a unique username and how your name appears to others."
         if self.onboarding_step == 2:
             return "Add a bio, your location, and a website (all optional)."
+        if self.onboarding_step == 3:
+            return "Upload an avatar and a profile banner to stand out."
         return "Control who can see your library, then launch your profile."
 
     @rx.var
     def own_avatar_url(self) -> str:
         if self.own_avatar:
-            return rx.get_upload_url("avatars/" + self.own_avatar)
+            return "/uploaded_files/avatars/" + self.own_avatar
+        return ""
+
+    @rx.var
+    def viewed_banner_url(self) -> str:
+        if self.viewed_banner:
+            return "/uploaded_files/banners/" + self.viewed_banner
         return ""
 
     @rx.var
     def viewed_avatar_url(self) -> str:
         if self.viewed_avatar:
-            return rx.get_upload_url("avatars/" + self.viewed_avatar)
+            return "/uploaded_files/avatars/" + self.viewed_avatar
         return ""
+
+    @rx.var
+    def own_banner_url(self) -> str:
+        if self.own_banner:
+            return "/uploaded_files/banners/" + self.own_banner
+        return ""
+
+    @rx.var
+    def viewed_lightbox_url(self) -> str:
+        if self.viewed_lightbox_filename:
+            return "/uploaded_files/" + self.viewed_lightbox_filename
+        return ""
+
+    @rx.var
+    def viewed_member_since_text(self) -> str:
+        if self.viewed_member_since:
+            return f"Joined {self.viewed_member_since}"
+        return ""
+
+    @rx.var
+    def is_guest(self) -> bool:
+        """True when the active session is a read-only guest account."""
+        return self.own_email == "guest@turkey.app"
 
     @rx.var
     def is_own_profile(self) -> bool:
@@ -179,7 +275,7 @@ class ProfileState(rx.State):
         return self.own_email
 
     def follow_user(self):
-        """Follow the currently viewed profile."""
+        """Request to follow the currently viewed profile."""
         viewer = self._get_viewer_email()
         if not viewer or not self.viewed_email or viewer == self.viewed_email:
             return
@@ -191,13 +287,28 @@ class ProfileState(rx.State):
                 )
             ).first()
             if not existing:
+                # Create pending follow
                 session.add(Follow(
                     follower_email=viewer,
                     following_email=self.viewed_email,
-                    created_at=datetime.utcnow().strftime("%Y-%m-%d"),
+                    status="pending",
+                    created_at=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                ))
+                # Create notification for the recipient
+                session.add(Notification(
+                    to_email=self.viewed_email,
+                    from_email=viewer,
+                    from_username=self.own_username,
+                    type="follow_request",
+                    status="unread",
+                    message=f"@{self.own_username} wants to follow you",
+                    created_at=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
                 ))
                 session.commit()
         self._reload_follow_state()
+        self.profile_toast_message = "Follow request sent to @" + self.viewed_username
+        self.profile_toast_visible = True
+
 
     def unfollow_user(self):
         """Unfollow the currently viewed profile."""
@@ -215,6 +326,8 @@ class ProfileState(rx.State):
                 session.delete(existing)
                 session.commit()
         self._reload_follow_state()
+        self.profile_toast_message = "Unfollowed @" + self.viewed_username
+        self.profile_toast_visible = True
 
     def _reload_follow_state(self):
         """Refresh follower/following counts and viewer_is_following."""
@@ -222,24 +335,31 @@ class ProfileState(rx.State):
         with rx.session() as session:
             self.viewed_follower_count = session.exec(
                 sqlmodel.select(sqlmodel.func.count(Follow.id)).where(
-                    Follow.following_email == self.viewed_email
+                    Follow.following_email == self.viewed_email,
+                    Follow.status == "accepted",
                 )
             ).one()
             self.viewed_following_count = session.exec(
                 sqlmodel.select(sqlmodel.func.count(Follow.id)).where(
-                    Follow.follower_email == self.viewed_email
+                    Follow.follower_email == self.viewed_email,
+                    Follow.status == "accepted",
                 )
             ).one()
-            if viewer and viewer != self.viewed_email:
-                link = session.exec(
-                    sqlmodel.select(Follow).where(
-                        Follow.follower_email == viewer,
-                        Follow.following_email == self.viewed_email,
-                    )
-                ).first()
-                self.viewer_is_following = link is not None
-            else:
-                self.viewer_is_following = False
+            # These are now computed rx.vars
+            pass
+
+    def dismiss_profile_toast(self):
+        self.profile_toast_visible = False
+
+    def set_profile_tab(self, tab: str):
+        self.active_profile_tab = tab
+
+    def copy_profile_link(self):
+        """Copies the profile URL and shows a toast."""
+        url = "https://turkey.app/u/" + self.viewed_username
+        self.profile_toast_message = "Profile link copied to clipboard!"
+        self.profile_toast_visible = True
+        return rx.set_clipboard(url)
 
     # ── Lifecycle ─────────────────────────────
 
@@ -273,6 +393,7 @@ class ProfileState(rx.State):
         self.own_website = profile.website
         self.own_is_public = profile.is_public
         self.own_avatar = profile.avatar_filename
+        self.own_banner = profile.banner_filename
         self.own_member_since = profile.created_at[:7] if profile.created_at else ""
 
     # ── Edit profile ──────────────────────────
@@ -292,6 +413,12 @@ class ProfileState(rx.State):
 
     def close_edit_profile(self):
         self.show_edit_profile = False
+
+    def toggle_edit_profile(self):
+        if self.show_edit_profile:
+            self.show_edit_profile = False
+        else:
+            self.open_edit_profile()
 
     def set_edit_username(self, v: str):
         self.edit_username = v.lower().strip()
@@ -403,6 +530,56 @@ class ProfileState(rx.State):
         finally:
             self.avatar_uploading = False
 
+    async def handle_banner_upload(self, files: list[rx.UploadFile]):
+        """Upload a profile banner (wide aspect ratio recommended)."""
+        if not files:
+            return
+        self.banner_uploading = True
+        self.banner_error = ""
+        file = files[0]
+        ext = os.path.splitext(file.filename)[1].lower()
+        if ext not in (".jpg", ".jpeg", ".png", ".webp"):
+            self.banner_error = "Only JPG, PNG, or WEBP allowed."
+            self.banner_uploading = False
+            return
+        
+        # Ensure banners dir exists
+        banner_dir = os.path.join("uploaded_files", "banners")
+        os.makedirs(banner_dir, exist_ok=True)
+        
+        data = await file.read()
+        if len(data) > 8 * 1024 * 1024:
+            self.banner_error = "Banner must be under 8 MB."
+            self.banner_uploading = False
+            return
+        
+        filename = f"banner_{uuid.uuid4().hex}{ext}"
+        save_path = os.path.join(banner_dir, filename)
+        with open(save_path, "wb") as f:
+            f.write(data)
+            
+        try:
+            with rx.session() as session:
+                profile = session.exec(
+                    sqlmodel.select(UserProfile).where(UserProfile.email == self.own_email)
+                ).first()
+                if profile:
+                    # Delete old
+                    if profile.banner_filename:
+                        old_p = os.path.join(banner_dir, profile.banner_filename)
+                        if os.path.exists(old_p):
+                            os.remove(old_p)
+                    profile.banner_filename = filename
+                    session.add(profile)
+                    session.commit()
+            self.own_banner = filename
+            self.profile_toast_message = "Profile banner updated!"
+            self.profile_toast_visible = True
+        except Exception as e:
+            self.banner_error = f"Banner upload failed: {e}"
+        finally:
+            self.banner_uploading = False
+
     # ── Search / discovery ────────────────────
 
     def set_search_query(self, q: str):
@@ -410,11 +587,17 @@ class ProfileState(rx.State):
 
     def run_search(self):
         """Search public profiles by username or display name."""
+        # Handle query from URL parameters if present
+        q_param = self.router.page.params.get("q")
+        if q_param:
+            self.search_query = q_param
+
         q = self.search_query.strip().lower()
         if not q:
             self.search_results = []
             self.search_done = False
-            return
+            return self.load_suggested_creators()
+        
         self.search_loading = True
         self.search_results = []
         try:
@@ -429,19 +612,24 @@ class ProfileState(rx.State):
             for p in profiles:
                 if q in p.username.lower() or q in (p.display_name or "").lower():
                     # Count their images
-                    with rx.session() as session:
-                        img_count = len(session.exec(
-                            sqlmodel.select(ImageRecord).where(ImageRecord.owner_email == p.email)
-                        ).all())
+                    img_count = session.exec(
+                        sqlmodel.select(sqlmodel.func.count(ImageRecord.id))
+                        .where(ImageRecord.owner_email == p.email)
+                    ).one()
                     results.append(SearchResult(
                         username=p.username,
                         display_name=p.display_name or p.username,
                         bio=p.bio or "",
                         location=p.location or "",
                         avatar_url=("avatars/" + p.avatar_filename) if p.avatar_filename else "",
+                        full_avatar_url=("/uploaded_files/avatars/" + p.avatar_filename) if p.avatar_filename else "",
                         member_since=p.created_at[:7] if p.created_at else "",
                         image_count=img_count,
                         image_count_str=str(img_count),
+                        follower_count=session.exec(
+                            sqlmodel.select(sqlmodel.func.count(Follow.id))
+                            .where(Follow.following_email == p.email)
+                        ).one(),
                     ))
             self.search_results = results
             self.search_done = True
@@ -450,6 +638,57 @@ class ProfileState(rx.State):
             self.search_done = True
         finally:
             self.search_loading = False
+
+    def load_suggested_creators(self):
+        """Load a few active public profiles to show as suggestions."""
+        self.suggested_loading = True
+        try:
+            with rx.session() as session:
+                # Get up to 5 random/recent public profiles
+                profiles = session.exec(
+                    sqlmodel.select(UserProfile).where(
+                        UserProfile.is_public == True,
+                        UserProfile.onboarding_complete == True,
+                        UserProfile.email != self.own_email,
+                    ).order_by(UserProfile.created_at.desc()).limit(5)
+                ).all()
+                results = []
+                for p in profiles:
+                    img_count = session.exec(
+                        sqlmodel.select(sqlmodel.func.count(ImageRecord.id))
+                        .where(ImageRecord.owner_email == p.email)
+                    ).one()
+                    results.append(SearchResult(
+                        username=p.username,
+                        display_name=p.display_name or p.username,
+                        bio=p.bio or "",
+                        location=p.location or "",
+                        avatar_url=("avatars/" + p.avatar_filename) if p.avatar_filename else "",
+                        full_avatar_url=("/uploaded_files/avatars/" + p.avatar_filename) if p.avatar_filename else "",
+                        member_since=p.created_at[:7] if p.created_at else "",
+                        image_count=img_count,
+                        image_count_str=str(img_count),
+                        follower_count=session.exec(
+                            sqlmodel.select(sqlmodel.func.count(Follow.id))
+                            .where(Follow.following_email == p.email)
+                        ).one(),
+                    ))
+                self.suggested_creators = results
+        except Exception:
+            self.suggested_creators = []
+        finally:
+            self.suggested_loading = False
+
+    def global_search_submit(self):
+        """Called on Enter in the navbar search input."""
+        q = self.search_query.strip()
+        if not q:
+            return
+        # If we are already on the search page, just run_search
+        if self.router.page.path == "/search":
+            return self.run_search()
+        # Otherwise, redirect to search page with query param
+        return rx.redirect(f"/search?q={q}")
 
     def clear_profile(self):
         """Called on logout."""
@@ -460,6 +699,80 @@ class ProfileState(rx.State):
         self.profile_loaded = False
         self.onboarding_complete = False
         self.show_onboarding = False
+
+    def init_guest(self):
+        """Set a minimal guest profile so is_guest == True in the UI."""
+        self.own_email = "guest@turkey.app"
+        self.own_username = "guest"
+        self.own_display_name = "Guest"
+        self.profile_loaded = True
+        self.onboarding_complete = False
+
+    # ── Notification Actions ──────────────────
+    def load_notifications(self):
+        """Fetch unread/pending notifications for the current user."""
+        if not self.own_email:
+            return
+        with rx.session() as session:
+            self.notifications = session.exec(
+                sqlmodel.select(Notification)
+                .where(Notification.to_email == self.own_email)
+                .order_by(Notification.created_at.desc())
+                .limit(20)
+            ).all()
+            self.unread_notifications_count = sum(1 for n in self.notifications if n.status == "unread")
+
+    def toggle_notifications(self):
+        self.show_notifications_dropdown = not self.show_notifications_dropdown
+        if self.show_notifications_dropdown:
+            self.load_notifications()
+
+    def accept_follow_request(self, notification_id: int):
+        """Accept a follow request."""
+        with rx.session() as session:
+            notif = session.get(Notification, notification_id)
+            if notif and notif.to_email == self.own_email:
+                # Update follow record
+                follow = session.exec(
+                    sqlmodel.select(Follow).where(
+                        Follow.follower_email == notif.from_email,
+                        Follow.following_email == notif.to_email,
+                        Follow.status == "pending"
+                    )
+                ).first()
+                if follow:
+                    follow.status = "accepted"
+                    session.add(follow)
+                
+                # Mark notification as accepted
+                notif.status = "accepted"
+                session.add(notif)
+                session.commit()
+        self.load_notifications()
+        self._reload_follow_state()
+
+    def decline_follow_request(self, notification_id: int):
+        """Decline a follow request."""
+        with rx.session() as session:
+            notif = session.get(Notification, notification_id)
+            if notif and notif.to_email == self.own_email:
+                # Delete follow record
+                follow = session.exec(
+                    sqlmodel.select(Follow).where(
+                        Follow.follower_email == notif.from_email,
+                        Follow.following_email == notif.to_email,
+                        Follow.status == "pending"
+                    )
+                ).first()
+                if follow:
+                    session.delete(follow)
+                
+                # Mark notification as declined
+                notif.status = "declined"
+                session.add(notif)
+                session.commit()
+        self.load_notifications()
+        self._reload_follow_state()
 
     # ── Onboarding setters ────────────────────
 
@@ -508,6 +821,8 @@ class ProfileState(rx.State):
             self.onboarding_step = 2
         elif self.onboarding_step == 2:
             self.onboarding_step = 3
+        elif self.onboarding_step == 3:
+            self.onboarding_step = 4
 
     def prev_step(self):
         if self.onboarding_step > 1:
@@ -538,6 +853,8 @@ class ProfileState(rx.State):
                     existing.website = self.website_input.strip()
                     existing.is_public = self.is_public_input
                     existing.onboarding_complete = True
+                    existing.avatar_filename = self.own_avatar
+                    existing.banner_filename = self.own_banner
                     session.add(existing)
                 else:
                     session.add(UserProfile(
@@ -551,6 +868,8 @@ class ProfileState(rx.State):
                         is_public=self.is_public_input,
                         created_at=now,
                         onboarding_complete=True,
+                        avatar_filename=self.own_avatar,
+                        banner_filename=self.own_banner,
                     ))
                 session.commit()
 
@@ -580,6 +899,7 @@ class ProfileState(rx.State):
         self.viewed_is_loading = True
         self.viewed_images = []
         self.viewed_email = ""
+        self.viewed_active_folder = self.router.page.params.get("folder", "")
         self.viewed_follower_count = 0
         self.viewed_following_count = 0
         self.viewer_is_following = False
@@ -607,28 +927,303 @@ class ProfileState(rx.State):
             self.viewed_location = profile.location
             self.viewed_website = profile.website
             self.viewed_avatar = profile.avatar_filename
+            self.viewed_banner = profile.banner_filename
             self.viewed_member_since = profile.created_at[:7] if profile.created_at else ""
 
-            # Load public images only
+            query = sqlmodel.select(ImageRecord).where(
+                ImageRecord.owner_email == profile.email,
+                ImageRecord.is_public == True,
+            )
+            if self.viewed_active_folder:
+                query = query.where(ImageRecord.folder_name == self.viewed_active_folder)
+            
             images = session.exec(
-                sqlmodel.select(ImageRecord)
-                .where(
-                    ImageRecord.owner_email == profile.email,
-                    ImageRecord.is_public == True,
-                )
-                .order_by(ImageRecord.created_at.desc())
-                .limit(60)
+                query.order_by(ImageRecord.created_at.desc()).limit(60)
             ).all()
             self.viewed_images = [
                 {
                     "filename": img.filename,
+                    "url": "/uploaded_files/" + img.filename,
                     "original_filename": img.original_filename,
                     "folder_name": img.folder_name,
                     "caption": img.caption,
+                    "image_id": img.id or 0,
                 }
                 for img in images
             ]
             self.viewed_image_count = len(self.viewed_images)
 
+            # Calculate total likes across all their images
+            image_ids = [img["image_id"] for img in self.viewed_images]
+            if image_ids:
+                self.viewed_total_likes = session.exec(
+                    sqlmodel.select(sqlmodel.func.count(Like.id))
+                    .where(Like.image_id.in_(image_ids))
+                ).one()
+            else:
+                self.viewed_total_likes = 0
+
+            # Load public collections
+            from TurkeyApp.models import Folder
+            colls = session.exec(
+                sqlmodel.select(Folder).where(
+                    Folder.owner_email == self.viewed_email,
+                    Folder.is_public == True,
+                )
+            ).all()
+            self.viewed_collections = []
+            for c in colls:
+                # Get a cover image
+                cover_img = session.exec(
+                    sqlmodel.select(ImageRecord).where(
+                        ImageRecord.owner_email == self.viewed_email,
+                        ImageRecord.folder_name == c.name,
+                        ImageRecord.is_public == True,
+                    ).limit(1)
+                ).first()
+                count = session.exec(
+                    sqlmodel.select(sqlmodel.func.count(ImageRecord.id)).where(
+                        ImageRecord.owner_email == self.viewed_email,
+                        ImageRecord.folder_name == c.name,
+                        ImageRecord.is_public == True,
+                    )
+                ).one()
+                self.viewed_collections.append({
+                    "name": c.name,
+                    "description": c.description,
+                    "cover": cover_img.filename if cover_img else "",
+                    "cover_url": ("/uploaded_files/" + cover_img.filename) if cover_img else "",
+                    "count": count,
+                    "count_text": f"{count} items",
+                })
+
         self.viewed_is_loading = False
         self._reload_follow_state()
+
+    def set_profile_tab(self, tab: str):
+        self.active_profile_tab = tab
+
+    # ── Public profile lightbox ───────────────
+
+    def _load_lightbox_data(self, image_id: int):
+        """Refresh like count, viewer_has_liked, and comments for lightbox."""
+        viewer = self._get_viewer_email()
+        with rx.session() as session:
+            # Likes
+            self.viewed_lightbox_like_count = session.exec(
+                sqlmodel.select(sqlmodel.func.count(Like.id))
+                .where(Like.image_id == image_id)
+            ).one()
+            if viewer:
+                self.viewed_lightbox_viewer_has_liked = session.exec(
+                    sqlmodel.select(Like).where(
+                        Like.liker_email == viewer, Like.image_id == image_id
+                    )
+                ).first() is not None
+            else:
+                self.viewed_lightbox_viewer_has_liked = False
+
+            # Comments
+            comments = session.exec(
+                sqlmodel.select(Comment).where(Comment.image_id == image_id)
+                .order_by(Comment.created_at.desc())
+            ).all()
+            self.viewed_lightbox_comments = [
+                {
+                    "id": c.id,
+                    "author_email": c.author_email,
+                    "author_username": c.author_username,
+                    "text": c.text,
+                    "created_at": c.created_at,
+                    "is_own": c.author_email == viewer
+                }
+                for c in comments
+            ]
+
+    def open_viewed_image(self, payload: dict):
+        """Open a public-profile gallery image in a lightbox."""
+        index = payload.get("index", 0)
+        if 0 <= index < len(self.viewed_images):
+            img = self.viewed_images[index]
+            self.viewed_lightbox_filename = img.get("filename", "")
+            self.viewed_lightbox_caption = img.get("caption", "")
+            self.viewed_lightbox_image_id = img.get("image_id", 0)
+            self.viewed_lightbox_index = index
+            self.show_viewed_lightbox = True
+            self._load_lightbox_data(self.viewed_lightbox_image_id)
+
+    def close_viewed_lightbox(self):
+        self.show_viewed_lightbox = False
+        self.viewed_lightbox_filename = ""
+        self.viewed_lightbox_index = -1
+
+    def prev_viewed_image(self):
+        idx = self.viewed_lightbox_index - 1
+        if idx >= 0:
+            img = self.viewed_images[idx]
+            self.viewed_lightbox_filename = img.get("filename", "")
+            self.viewed_lightbox_caption = img.get("caption", "")
+            self.viewed_lightbox_image_id = img.get("image_id", 0)
+            self.viewed_lightbox_index = idx
+            self._load_lightbox_data(self.viewed_lightbox_image_id)
+
+    def next_viewed_image(self):
+        idx = self.viewed_lightbox_index + 1
+        if idx < len(self.viewed_images):
+            img = self.viewed_images[idx]
+            self.viewed_lightbox_filename = img.get("filename", "")
+            self.viewed_lightbox_caption = img.get("caption", "")
+            self.viewed_lightbox_image_id = img.get("image_id", 0)
+            self.viewed_lightbox_index = idx
+            self._load_lightbox_data(self.viewed_lightbox_image_id)
+
+    def toggle_profile_like(self):
+        """Like/unlike the image currently open in the profile lightbox."""
+        viewer = self._get_viewer_email()
+        image_id = self.viewed_lightbox_image_id
+        if not viewer or image_id == 0:
+            return
+        with rx.session() as session:
+            existing = session.exec(
+                sqlmodel.select(Like).where(
+                    Like.liker_email == viewer,
+                    Like.image_id == image_id,
+                )
+            ).first()
+            if existing:
+                session.delete(existing)
+                session.commit()
+            else:
+                session.add(Like(
+                    liker_email=viewer,
+                    image_id=image_id,
+                    created_at=datetime.utcnow().strftime("%Y-%m-%d"),
+                ))
+                session.commit()
+        self._load_lightbox_data(image_id)
+
+    def add_comment(self):
+        """Add a comment to the current photo."""
+        viewer = self._get_viewer_email()
+        image_id = self.viewed_lightbox_image_id
+        text = self.comment_input.strip()
+        if not viewer or not text or image_id == 0:
+            return
+        
+        self.comment_loading = True
+        try:
+            with rx.session() as session:
+                new_comment = Comment(
+                    image_id=image_id,
+                    author_email=viewer,
+                    author_username=self.own_username,
+                    text=text,
+                    created_at=datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
+                )
+                session.add(new_comment)
+                
+                # Notify owner if it's not them
+                if self.viewed_email != viewer:
+                    session.add(Notification(
+                        to_email=self.viewed_email,
+                        from_email=viewer,
+                        from_username=self.own_username,
+                        type="comment",
+                        message=f"@{self.own_username} commented: {text[:20]}...",
+                        created_at=datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                    ))
+                session.commit()
+            self.comment_input = ""
+            self._load_lightbox_data(image_id)
+        finally:
+            self.comment_loading = False
+
+    def delete_comment(self, comment_id: int):
+        """Delete a comment if you are the author or the photo owner."""
+        viewer = self._get_viewer_email()
+        if not viewer: return
+        with rx.session() as session:
+            comment = session.get(Comment, comment_id)
+            if comment and (comment.author_email == viewer or self.viewed_email == viewer):
+                session.delete(comment)
+                session.commit()
+        self._load_lightbox_data(self.viewed_lightbox_image_id)
+
+    @rx.var
+    def viewed_lightbox_has_prev(self) -> bool:
+        return self.viewed_lightbox_index > 0
+
+    @rx.var
+    def viewed_lightbox_has_next(self) -> bool:
+        return self.viewed_lightbox_index < len(self.viewed_images) - 1
+
+    def copy_image_link(self):
+        """Direct link to the currently viewed image in the lightbox."""
+        if not self.viewed_lightbox_filename: return
+        url = rx.get_upload_url(self.viewed_lightbox_filename)
+        # Using a full site URL would be better but let's stick to the upload URL for now
+        # especially since they don't have a permalink page yet.
+        # Alternatively, we could link to the user's profile with an anchor or param.
+        profile_url = f"https://turkey.app/u/{self.viewed_username}?img={self.viewed_lightbox_image_id}"
+        self.profile_toast_message = "Direct image link copied!"
+        self.profile_toast_visible = True
+        return rx.set_clipboard(profile_url)
+
+    # ── Notifications Management ────────────────
+    def toggle_notifications(self):
+        self.show_notifications_dropdown = not self.show_notifications_dropdown
+        if self.show_notifications_dropdown:
+            return self.load_notifications()
+
+    def accept_follow_request(self, notification_id: int):
+        with rx.session() as session:
+            notif = session.get(Notification, notification_id)
+            if notif and notif.type == "follow_request":
+                # Update follow record
+                follow = session.exec(
+                    sqlmodel.select(Follow).where(
+                        Follow.follower_email == notif.from_email,
+                        Follow.following_email == self.own_email
+                    )
+                ).first()
+                if follow:
+                    follow.status = "accepted"
+                    session.add(follow)
+                
+                # Mark notification as read or accepted
+                notif.status = "accepted"
+                session.add(notif)
+                session.commit()
+        return self.load_notifications()
+
+    def decline_follow_request(self, notification_id: int):
+        with rx.session() as session:
+            notif = session.get(Notification, notification_id)
+            if notif and notif.type == "follow_request":
+                # Delete follow record
+                follow = session.exec(
+                    sqlmodel.select(Follow).where(
+                        Follow.follower_email == notif.from_email,
+                        Follow.following_email == self.own_email
+                    )
+                ).first()
+                if follow:
+                    session.delete(follow)
+                
+                # Mark notification as Declined
+                notif.status = "declined"
+                session.add(notif)
+                session.commit()
+        self.load_notifications()
+
+    def goto_profile(self, username: str):
+        """Server-side redirect to a user profile."""
+        return rx.redirect(f"/u/{username}")
+
+    def goto_collection(self, username: str, folder_name: str):
+        """Redirect to a specific collection (folder) on a user's profile."""
+        return rx.redirect(f"/u/{username}?folder={folder_name}")
+
+    def clear_collection_filter(self):
+        """Clear the folder filter and show all public photos."""
+        return rx.redirect(f"/u/{self.viewed_username}")

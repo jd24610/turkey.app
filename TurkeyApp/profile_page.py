@@ -1,396 +1,426 @@
-"""Public profile page — /u/[username]"""
+"""Public Profile Page UI — /u/[username]"""
 
 import reflex as rx
 from TurkeyApp.profile_state import ProfileState
+from TurkeyApp.navbar import navbar
 
 
-# ─── Avatar helpers ────────────────────────────────────────────────────────────
+# ─── Components ─────────────────────────────────────────────────────────────
 
-def initials_avatar(initials: rx.Var, size: str = "96px") -> rx.Component:
-    """Purple gradient circle with user initials."""
-    return rx.box(
-        rx.text(initials, size="7", weight="bold", color="white"),
-        width=size, height=size,
-        border_radius="50%",
-        background="linear-gradient(135deg, #6d28d9, #a855f7)",
-        display="flex",
-        align_items="center",
-        justify_content="center",
-        box_shadow="0 8px 32px rgba(124,58,237,0.5)",
-        border="3px solid rgba(168,85,247,0.4)",
-        flex_shrink="0",
-    )
-
-
-# ─── Profile image card ────────────────────────────────────────────────────────
-
-def profile_gallery_card(img: dict) -> rx.Component:
-    return rx.box(
-        rx.image(
-            src=rx.get_upload_url(img["filename"]),
-            width="100%",
-            height="180px",
-            object_fit="cover",
-            border_radius="12px",
-            display="block",
-            loading="lazy",
-        ),
-        rx.cond(
-            img["caption"] != "",
-            rx.box(
-                rx.text(
-                    img["caption"],
-                    size="1",
-                    color="#9ca3af",
-                    overflow="hidden",
-                    text_overflow="ellipsis",
-                    white_space="nowrap",
-                ),
-                padding="6px 8px 8px",
-            ),
-            rx.box(
-                rx.text(
-                    img["original_filename"],
-                    size="1",
-                    color="#4b5563",
-                    overflow="hidden",
-                    text_overflow="ellipsis",
-                    white_space="nowrap",
-                ),
-                padding="6px 8px 8px",
-            ),
-        ),
-        background="rgba(255,255,255,0.03)",
-        border="1px solid rgba(124,58,237,0.15)",
-        border_radius="14px",
-        overflow="hidden",
-        _hover={
-            "border_color": "rgba(168,85,247,0.4)",
-            "transform": "translateY(-2px)",
-            "box_shadow": "0 8px 24px rgba(0,0,0,0.3)",
-        },
-        transition="all 0.2s ease",
-        cursor="pointer",
-    )
-
-
-# ─── Not found / private ───────────────────────────────────────────────────────
-
-def profile_not_found() -> rx.Component:
-    return rx.box(
-        rx.vstack(
-            rx.icon("user-x", size=56, color="#7c3aed"),
-            rx.heading("Profile not found", size="6", color="white"),
-            rx.text(
-                "This profile is either private or doesn't exist.",
-                size="3", color="#6b7280", text_align="center",
-            ),
-            rx.button(
-                rx.icon("home", size=16),
-                "Back to turkey.app",
-                on_click=rx.redirect("/"),
-                size="3",
-                background="linear-gradient(135deg, #7c3aed, #a855f7)",
-                color="white",
-                border_radius="12px",
-                cursor="pointer",
-            ),
-            spacing="5",
-            align="center",
-            justify="center",
-            min_height="80vh",
-        ),
-        width="100%",
-        display="flex",
-        align_items="center",
-        justify_content="center",
-    )
-
-
-# ─── Profile header ────────────────────────────────────────────────────────────
-
-def profile_header() -> rx.Component:
-    return rx.box(
-        # Banner gradient
-        rx.box(
-            height="220px",
-            background="radial-gradient(ellipse at 30% 50%, #3b0764 0%, #1e0a3c 40%, #080514 100%)",
-            position="relative",
-            overflow="hidden",
-            _after={
-                "content": "''",
-                "position": "absolute",
-                "bottom": "0",
-                "left": "0",
-                "right": "0",
-                "height": "80px",
-                "background": "linear-gradient(to bottom, transparent, #050210)",
-            },
-        ),
-        # Avatar + info row
+def profile_toast() -> rx.Component:
+    """General feedback toast for profiles."""
+    return rx.cond(
+        ProfileState.profile_toast_visible,
         rx.box(
             rx.hstack(
-                rx.box(
-                    rx.cond(
-                        ProfileState.viewed_avatar_url != "",
-                        rx.image(
-                            src=ProfileState.viewed_avatar_url,
-                            width="96px",
-                            height="96px",
-                            object_fit="cover",
-                            border_radius="50%",
-                            border="3px solid rgba(168,85,247,0.5)",
-                        ),
-                        initials_avatar(ProfileState.viewed_initials, size="96px"),
-                    ),
-                    margin_top="-52px",
-                    position="relative",
-                    z_index="1",
+                rx.icon("sparkles", size=18, color="#a855f7"),
+                rx.text(
+                    ProfileState.profile_toast_message,
+                    size="2", weight="medium", color="white",
                 ),
-                rx.vstack(
-                    rx.hstack(
-                        rx.heading(
-                            ProfileState.viewed_display_name,
-                            size="7", color="white", weight="bold",
-                        ),
-                        rx.cond(
-                            ProfileState.viewed_location != "",
-                            rx.hstack(
-                                rx.icon("map-pin", size=14, color="#6b7280"),
-                                rx.text(ProfileState.viewed_location, size="2", color="#6b7280"),
-                                spacing="1", align="center",
-                                padding_top="6px",
-                            ),
-                            rx.box(),
-                        ),
-                        spacing="4",
-                        align="end",
-                        flex_wrap="wrap",
-                    ),
-                    rx.text(
-                        "@" + ProfileState.viewed_username,
-                        size="3", color="#a78bfa", weight="medium",
-                    ),
-                    rx.cond(
-                        ProfileState.viewed_bio != "",
-                        rx.text(
-                            ProfileState.viewed_bio,
-                            size="3", color="#d1d5db",
-                            max_width="560px",
-                        ),
-                        rx.box(),
-                    ),
-                    # Follow / Unfollow button (only when not own profile)
-                    rx.cond(
-                        ~ProfileState.is_own_profile,
-                        rx.cond(
-                            ProfileState.viewer_is_following,
-                            rx.button(
-                                rx.icon("user-check", size=15),
-                                "Following",
-                                on_click=ProfileState.unfollow_user,
-                                size="2",
-                                variant="outline",
-                                color_scheme="purple",
-                                border_radius="20px",
-                                cursor="pointer",
-                                _hover={"background": "rgba(124,58,237,0.15)"},
-                            ),
-                            rx.button(
-                                rx.icon("user-plus", size=15),
-                                "Follow",
-                                on_click=ProfileState.follow_user,
-                                size="2",
-                                background="linear-gradient(135deg, #7c3aed, #a855f7)",
-                                color="white",
-                                border_radius="20px",
-                                cursor="pointer",
-                                _hover={"opacity": "0.9"},
-                            ),
-                        ),
-                        rx.box(),
-                    ),
-                    spacing="2", align="start",
-                    padding_top="8px",
+                rx.button(
+                    rx.icon("x", size=13),
+                    on_click=ProfileState.dismiss_profile_toast,
+                    size="1", variant="ghost", color_scheme="gray",
                 ),
-                spacing="5",
-                align="start",
-                padding_x="32px",
-                padding_bottom="24px",
-                flex_wrap="wrap",
-                width="100%",
+                spacing="3", align="center",
             ),
+            position="fixed",
+            bottom="28px", left="50%",
+            transform="translateX(-50%)",
+            z_index="9999",
+            padding="12px 20px",
+            background="#111827",
+            border_radius="14px",
+            box_shadow="0 8px 32px rgba(0,0,0,0.25)",
+            white_space="nowrap",
         ),
-        position="relative",
-        width="100%",
-        overflow="visible",
+        rx.box(),
     )
 
 
-# ─── Stats bar ─────────────────────────────────────────────────────────────────
+def profile_header() -> rx.Component:
+    """Banner and identity section."""
+    return rx.box(
+        # Banner
+        rx.box(
+            rx.cond(
+                ProfileState.viewed_banner != "",
+                rx.image(
+                    src=ProfileState.viewed_banner_url,
+                    width="100%", height="320px",
+                    object_fit="cover",
+                ),
+                rx.box(
+                    width="100%", height="240px",
+                    background="linear-gradient(135deg, #7c3aed 0%, #a855f7 100%)",
+                    opacity="0.9",
+                ),
+            ),
+            width="100%", overflow="hidden",
+        ),
+        # Identity
+        rx.vstack(
+            rx.box(
+                rx.cond(
+                    ProfileState.viewed_avatar != "",
+                    rx.image(
+                        src=ProfileState.viewed_avatar_url,
+                        width="160px", height="160px",
+                        border_radius="50%", object_fit="cover",
+                        border="4px solid white",
+                    ),
+                    rx.center(
+                        rx.text(ProfileState.viewed_initials, size="8", weight="bold", color="white"),
+                        width="160px", height="160px",
+                        border_radius="50%",
+                        background="linear-gradient(135deg, #7c3aed, #a855f7)",
+                        border="4px solid white",
+                    ),
+                ),
+                margin_top="-80px",
+                z_index="10",
+            ),
+            rx.heading(ProfileState.viewed_display_name, size="8", color="#111827", weight="bold"),
+            rx.text("@" + ProfileState.viewed_username, size="3", color="#7c3aed", weight="medium"),
+            rx.text(ProfileState.viewed_bio, size="4", color="#4b5563", text_align="center", max_width="600px", margin_top="12px"),
+            
+            # Follow / Unfollow logic
+            rx.box(
+                rx.cond(
+                    # If viewing own profile, show nothing or edit
+                    ProfileState.viewed_email == ProfileState.own_email,
+                    rx.box(),
+                    rx.cond(
+                        ProfileState.viewer_is_following,
+                        rx.button(
+                            "Following",
+                            on_click=ProfileState.unfollow_user,
+                            size="3", variant="outline", color_scheme="gray",
+                            cursor="pointer",
+                        ),
+                        rx.button(
+                            rx.icon("user-plus", size=18),
+                            "Follow",
+                            on_click=ProfileState.follow_user,
+                            size="3",
+                            background="#7c3aed", color="white",
+                            border_radius="12px",
+                            cursor="pointer",
+                        ),
+                    ),
+                ),
+                margin_top="24px",
+            ),
+
+            spacing="2", align="center", width="100%", padding_top="4px",
+        ),
+        width="100%", padding_bottom="32px",
+    )
+
 
 def profile_stats() -> rx.Component:
-    def stat(icon: str, val: rx.Var, label: str) -> rx.Component:
+    """Horizontal stats bar below identity."""
+    def stat(icon: str, value: rx.Var, label: str) -> rx.Component:
         return rx.hstack(
-            rx.icon(icon, size=16, color="#a78bfa"),
-            rx.text(val, size="3", weight="bold", color="white"),
+            rx.icon(icon, size=16, color="#7c3aed"),
+            rx.text(value.to_string(), size="2", weight="bold", color="#111827"),
             rx.text(label, size="2", color="#6b7280"),
             spacing="2", align="center",
         )
 
-    return rx.hstack(
-        stat("images", ProfileState.viewed_image_count, "Photos"),
-        rx.box(width="1px", height="20px", background="rgba(255,255,255,0.1)"),
-        stat("users", ProfileState.viewed_follower_count, "Followers"),
-        rx.box(width="1px", height="20px", background="rgba(255,255,255,0.1)"),
-        stat("user-check", ProfileState.viewed_following_count, "Following"),
-        rx.box(width="1px", height="20px", background="rgba(255,255,255,0.1)"),
+    return rx.center(
         rx.hstack(
-            rx.icon("calendar", size=16, color="#a78bfa"),
-            rx.text("Joined " + ProfileState.viewed_member_since, size="2", color="#6b7280"),
-            spacing="2", align="center",
+            stat("image", ProfileState.viewed_image_count, "Photos"),
+            rx.box(width="1px", height="16px", background="#e5e7eb"),
+            stat("heart", ProfileState.viewed_total_likes, "Likes"),
+            rx.box(width="1px", height="16px", background="#e5e7eb"),
+            stat("users", ProfileState.viewed_follower_count, "Followers"),
+            rx.box(width="1px", height="16px", background="#e5e7eb"),
+            stat("user-check", ProfileState.viewed_following_count, "Following"),
+            rx.box(width="1px", height="16px", background="#e5e7eb"),
+            rx.hstack(
+                rx.icon("calendar", size=16, color="#7c3aed"),
+                rx.text(ProfileState.viewed_member_since_text, size="2", color="#6b7280"),
+                spacing="2", align="center",
+            ),
+            # Share
+            rx.spacer(),
+            rx.button(
+                rx.icon("link", size=14),
+                "Copy Link",
+                on_click=ProfileState.copy_profile_link,
+                size="1", variant="ghost",
+            ),
+            spacing="5", align="center", width="100%", max_width="1200px", padding_x="24px",
         ),
-        rx.cond(
-            ProfileState.viewed_website != "",
-            rx.fragment(
-                rx.box(width="1px", height="20px", background="rgba(255,255,255,0.1)"),
+        width="100%", border_top="1px solid #f1f1f1", border_bottom="1px solid #f1f1f1", padding_y="16px",
+    )
+
+
+def profile_tabs() -> rx.Component:
+    """Tab switcher for All Posts vs Collections."""
+    def nav_tab(label: str, value: str) -> rx.Component:
+        is_active = ProfileState.active_profile_tab == value
+        return rx.box(
+            rx.text(label, size="3", weight=rx.cond(is_active, "bold", "medium")),
+            on_click=lambda: ProfileState.set_profile_tab(value),
+            padding="12px 24px",
+            height="100%",
+            display="flex", align_items="center",
+            cursor="pointer",
+            border_bottom=rx.cond(is_active, "2px solid #7c3aed", "2px solid transparent"),
+            color=rx.cond(is_active, "#111827", "#6b7280"),
+            _hover={"color": "#111827"},
+            transition="all 0.2s ease",
+        )
+    return rx.center(
+        rx.hstack(
+            nav_tab("All Posts", "all"),
+            nav_tab("Collections", "collections"),
+            spacing="1", align="center", height="50px",
+        ),
+        width="100%",
+        border_bottom="1px solid #f1f1f1",
+        margin_bottom="32px",
+    )
+
+
+def profile_gallery_card(img: rx.Base, index: int) -> rx.Component:
+    """A card for human-viewable content."""
+    return rx.box(
+        rx.vstack(
+            rx.image(
+                src=img["url"],
+                width="100%", height="auto",
+                border_radius="12px",
+                transition="transform 0.3s ease",
+                _hover={"transform": "scale(1.02)"},
+            ),
+            rx.cond(
+                img["caption"] != "",
+                rx.text(img["caption"], size="2", color="#374151", margin_top="8px", padding_x="4px"),
+                rx.box(),
+            ),
+            spacing="0", align="start",
+        ),
+        on_click=lambda: ProfileState.open_viewed_image({"index": index}),
+        cursor="pointer",
+        width="100%",
+        margin_bottom="24px",
+    )
+
+
+def profile_gallery_header() -> rx.Component:
+    """Shows active folder filter information if any."""
+    return rx.cond(
+        ProfileState.viewed_active_folder != "",
+        rx.hstack(
+            rx.vstack(
                 rx.hstack(
-                    rx.icon("globe", size=16, color="#a78bfa"),
-                    rx.link(
-                        ProfileState.viewed_website,
-                        href=ProfileState.viewed_website,
-                        is_external=True,
-                        size="2",
-                        color="#a78bfa",
-                        _hover={"color": "#c4b5fd"},
+                    rx.icon("folder-open", size=18, color="#7c3aed"),
+                    rx.heading(
+                        ProfileState.viewed_active_folder,
+                        size="5", color="#111827", weight="bold"
                     ),
                     spacing="2", align="center",
                 ),
+                rx.text(
+                    "Showing images from this collection",
+                    size="2", color="#6b7280"
+                ),
+                spacing="1", align="start",
             ),
-            rx.box(),
-        ),
-        # Share / copy link button
-        rx.spacer(),
-        rx.button(
-            rx.icon("link", size=14),
-            "Copy Link",
-            on_click=rx.set_clipboard(
-                "https://turkey.app/u/" + ProfileState.viewed_username
+            rx.spacer(),
+            rx.button(
+                "Show all photos",
+                on_click=ProfileState.clear_collection_filter,
+                size="2", variant="ghost", color_scheme="purple",
+                cursor="pointer",
             ),
-            size="1",
-            variant="ghost",
-            color_scheme="purple",
-            cursor="pointer",
-            _hover={"background": "rgba(124,58,237,0.15)"},
+            width="100%", max_width="1400px", padding_x="24px",
+            margin_bottom="32px",
+            background="rgba(124,58,237,0.03)",
+            padding_y="16px",
+            border_radius="16px",
+            border="1px solid rgba(124,58,237,0.1)",
         ),
-        spacing="5",
-        align="center",
-        padding="16px 32px",
-        background="rgba(255,255,255,0.02)",
-        border_top="1px solid rgba(124,58,237,0.12)",
-        border_bottom="1px solid rgba(124,58,237,0.12)",
-        width="100%",
-        flex_wrap="wrap",
-        gap="4",
+        rx.box(),
     )
 
 
-# ─── Gallery grid ──────────────────────────────────────────────────────────────
-
 def profile_gallery() -> rx.Component:
+    """Masonry-style photo grid."""
     return rx.box(
         rx.cond(
             ProfileState.viewed_images.length() > 0,
-            rx.box(
-                rx.grid(
+            rx.vstack(
+                profile_gallery_header(),
+                rx.box(
                     rx.foreach(
                         ProfileState.viewed_images,
-                        profile_gallery_card,
+                        lambda img, i: profile_gallery_card(img, i)
                     ),
-                    columns="4",
-                    spacing="4",
+                    column_count=rx.breakpoints(initial="1", sm="2", md="3", lg="4"),
+                    column_gap="24px",
                     width="100%",
                 ),
-                width="100%",
+                spacing="0", width="100%",
             ),
-            rx.vstack(
-                rx.icon("image-off", size=48, color="#374151"),
-                rx.text("No public images yet.", size="3", color="#4b5563"),
-                spacing="3",
-                align="center",
-                padding_y="60px",
-                width="100%",
+            rx.center(
+                rx.text("No public photos yet.", size="3", color="#9ca3af"),
+                padding_y="100px",
             ),
         ),
-        padding="32px",
-        width="100%",
-        max_width="1200px",
-        margin="0 auto",
+        width="100%", max_width="1400px", padding_x="24px", margin="0 auto",
     )
 
 
-# ─── Loading state ─────────────────────────────────────────────────────────────
+def collections_grid() -> rx.Component:
+    """Grid of public folders/collections."""
+    return rx.box(
+        rx.cond(
+            ProfileState.viewed_collections.length() > 0,
+            rx.grid(
+                rx.foreach(
+                    ProfileState.viewed_collections,
+                    lambda c: rx.vstack(
+                        rx.box(
+                            rx.cond(
+                                c["cover"] != "",
+                                rx.image(
+                                    src=c["cover_url"],
+                                    width="100%", height="240px",
+                                    object_fit="cover",
+                                    border_radius="14px",
+                                ),
+                                rx.center(
+                                    rx.icon("folder", size=32, color="#d1d5db"),
+                                    width="100%", height="240px",
+                                    background="#f3f4f6",
+                                    border_radius="14px",
+                                ),
+                            ),
+                            width="100%", overflow="hidden",
+                        ),
+                        rx.vstack(
+                            rx.text(c["name"], size="4", weight="bold", color="#111827"),
+                            rx.cond(
+                                c["description"] != "",
+                                rx.text(c["description"], size="2", color="#4b5563", line_limit=2),
+                                rx.box(),
+                            ),
+                            rx.text(c["count_text"], size="2", color="#6b7280"),
+                            spacing="1", align="start",
+                        ),
+                        spacing="3", align="start", width="100%",
+                        cursor="pointer",
+                        _hover={"opacity": "0.8"},
+                        on_click=ProfileState.goto_collection(ProfileState.viewed_username, c["name"]),
+                    ),
+                ),
+                columns=rx.breakpoints(initial="1", sm="2", md="3", lg="4"),
+                spacing="6",
+                width="100%",
+            ),
+            rx.center(
+                rx.text("No public collections yet.", size="3", color="#9ca3af"),
+                padding_y="100px",
+            ),
+        ),
+        width="100%", max_width="1400px", padding_x="24px", margin="0 auto",
+    )
+
+
+def profile_lightbox() -> rx.Component:
+    """Fullscreen lightbox with comments side panel."""
+    return rx.cond(
+        ProfileState.show_viewed_lightbox,
+        rx.box(
+            # Image + Side Panel Container
+            rx.hstack(
+                # LEFT: Image & Metadata
+                rx.vstack(
+                    rx.image(
+                        src=ProfileState.viewed_lightbox_url,
+                        max_width="60vw",
+                        max_height="76vh",
+                        object_fit="contain",
+                        border_radius="14px 0 0 14px",
+                    ),
+                    rx.cond(
+                        ProfileState.viewed_lightbox_caption != "",
+                        rx.text(ProfileState.viewed_lightbox_caption, size="2", color="#4b5563", text_align="center"),
+                        rx.box(),
+                    ),
+                    # Actions
+                    rx.hstack(
+                        rx.button(
+                            rx.cond(ProfileState.viewed_lightbox_viewer_has_liked, rx.icon("heart", fill="#f43f5e", color="#f43f5e"), rx.icon("heart")),
+                            ProfileState.viewed_lightbox_like_count.to_string(),
+                            on_click=ProfileState.toggle_profile_like,
+                            variant="soft", color_scheme="red",
+                        ),
+                        rx.button(rx.icon("link"), "Share", on_click=ProfileState.copy_image_link, variant="soft", color_scheme="purple"),
+                        spacing="4",
+                    ),
+                    spacing="4", align="center", padding="24px", flex="1", background="white", border_radius="14px 0 0 14px",
+                ),
+                # RIGHT: Comments Panel
+                rx.box(
+                    rx.vstack(
+                        rx.text("Comments", size="4", weight="bold", color="#111827"),
+                        rx.divider(),
+                        rx.box(
+                            rx.foreach(
+                                ProfileState.viewed_lightbox_comments,
+                                lambda c: rx.vstack(
+                                    rx.hstack(
+                                        rx.text("@", c["author_username"], size="2", weight="bold", color="#7c3aed"),
+                                        rx.spacer(),
+                                        rx.text(c["created_at"], size="1", color="#9ca3af"),
+                                    ),
+                                    rx.text(c["text"], size="2", color="#374151"),
+                                    spacing="1", align="start", width="100%", padding="8px", background="#f9fafb", border_radius="8px", margin_bottom="8px",
+                                )
+                            ),
+                            flex="1", overflow_y="auto", width="100%",
+                        ),
+                        rx.vstack(
+                            rx.text_area(value=ProfileState.comment_input, on_change=ProfileState.set_comment_input, placeholder="Add a comment...", width="100%", size="2"),
+                            rx.button("Post", on_click=ProfileState.add_comment, loading=ProfileState.comment_loading, width="100%", color_scheme="purple"),
+                            spacing="2", width="100%",
+                        ),
+                        spacing="4", height="100%",
+                    ),
+                    width="340px", background="white", border_left="1px solid #f1f1f1", padding="24px", border_radius="0 14px 14px 0",
+                ),
+                spacing="0", background="white", border_radius="14px", box_shadow="0 30px 80px rgba(0,0,0,0.2)",
+            ),
+            # Close / Nav
+            rx.button(rx.icon("chevron-left"), on_click=ProfileState.prev_viewed_image, position="fixed", left="4%", z_index="2002"),
+            rx.button(rx.icon("chevron-right"), on_click=ProfileState.next_viewed_image, position="fixed", right="4%", z_index="2002"),
+            rx.button(rx.icon("x"), on_click=ProfileState.close_viewed_lightbox, position="fixed", top="20px", right="30px", z_index="2003"),
+            
+            position="fixed", inset="0", background="rgba(0,0,0,0.8)", backdrop_filter="blur(8px)", display="flex", align_items="center", justify_content="center", z_index="2000",
+        ),
+        rx.box(),
+    )
+
 
 def profile_loading() -> rx.Component:
-    return rx.box(
-        rx.vstack(
-            rx.spinner(size="3", color="#a855f7"),
-            rx.text("Loading profile…", size="2", color="#6b7280"),
-            spacing="3", align="center", justify="center",
-            min_height="60vh",
-        ),
-        width="100%",
-        display="flex",
-        align_items="center",
-        justify_content="center",
-    )
+    return rx.center(rx.spinner(size="3", color="#7c3aed"), min_height="60vh")
 
 
-# ─── Mini top navbar ──────────────────────────────────────────────────────────
+def profile_not_found() -> rx.Component:
+    return rx.center(rx.text("Profile not found", size="5"), min_height="60vh")
 
-def profile_nav() -> rx.Component:
-    return rx.hstack(
-        rx.hstack(
-            rx.image(src="/turkey_icon.png", width="30px", height="30px", border_radius="8px"),
-            rx.hstack(
-                rx.text("turkey", size="3", weight="bold", color="white"),
-                rx.text(".app", size="3", weight="bold", color="#a855f7"),
-                spacing="0",
-            ),
-            spacing="2",
-            align="center",
-            cursor="pointer",
-            on_click=rx.redirect("/"),
-        ),
-        rx.button(
-            rx.icon("log-in", size=15),
-            "Open My Library",
-            on_click=rx.redirect("/library"),
-            size="2",
-            background="linear-gradient(135deg, #7c3aed, #a855f7)",
-            color="white",
-            border_radius="10px",
-            cursor="pointer",
-        ),
-        justify="between",
-        align="center",
-        padding="0 24px",
-        height="56px",
-        background="rgba(5,2,16,0.9)",
-        border_bottom="1px solid rgba(124,58,237,0.15)",
-        backdrop_filter="blur(12px)",
-        position="sticky",
-        top="0",
-        z_index="100",
-        width="100%",
-    )
-
-
-# ─── Full page ────────────────────────────────────────────────────────────────
 
 def public_profile_page() -> rx.Component:
     return rx.box(
-        profile_nav(),
+        profile_toast(),
+        profile_lightbox(),
+        navbar(active_page="profile"),
         rx.cond(
             ProfileState.viewed_is_loading,
             profile_loading(),
@@ -400,12 +430,15 @@ def public_profile_page() -> rx.Component:
                 rx.box(
                     profile_header(),
                     profile_stats(),
-                    profile_gallery(),
+                    profile_tabs(),
+                    rx.cond(
+                        ProfileState.active_profile_tab == "all",
+                        profile_gallery(),
+                        collections_grid(),
+                    ),
                     width="100%",
                 ),
             ),
         ),
-        min_height="100vh",
-        background="radial-gradient(ellipse at top, #130a2e 0%, #050210 50%, #020108 100%)",
-        width="100%",
+        min_height="100vh", background="#ffffff",
     )

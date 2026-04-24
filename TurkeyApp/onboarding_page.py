@@ -20,14 +20,14 @@ def _step_dot(n: int) -> rx.Component:
         background=rx.cond(
             active | done,
             "linear-gradient(135deg, #7c3aed, #a855f7)",
-            "rgba(255,255,255,0.1)",
+            "#f3f4f6",
         ),
         border=rx.cond(
             active,
             "2px solid #a855f7",
             "2px solid transparent",
         ),
-        box_shadow=rx.cond(active, "0 0 12px rgba(168,85,247,0.6)", "none"),
+        box_shadow=rx.cond(active, "0 0 12px rgba(168,85,247,0.4)", "none"),
         display="flex",
         align_items="center",
         justify_content="center",
@@ -46,7 +46,7 @@ def _step_line(active: rx.Var) -> rx.Component:
         ),
         height="2px",
         flex="1",
-        background="rgba(255,255,255,0.08)",
+        background="#f1f1f1",
         border_radius="2px",
         overflow="hidden",
     )
@@ -59,8 +59,10 @@ def step_indicator() -> rx.Component:
         _step_dot(2),
         _step_line(ProfileState.onboarding_step > 2),
         _step_dot(3),
+        _step_line(ProfileState.onboarding_step > 3),
+        _step_dot(4),
         align="center",
-        width="200px",
+        width="260px",
         spacing="0",
     )
 
@@ -70,7 +72,7 @@ def step_indicator() -> rx.Component:
 def step_one() -> rx.Component:
     return rx.vstack(
         rx.vstack(
-            rx.text("@username", size="1", color="#a78bfa", weight="medium", letter_spacing="1px"),
+            rx.text("@username", size="1", color="#7c3aed", weight="medium", letter_spacing="1px"),
             rx.hstack(
                 rx.text("@", size="4", color="#7c3aed", weight="bold", padding_top="2px"),
                 rx.input(
@@ -79,12 +81,12 @@ def step_one() -> rx.Component:
                     placeholder="your_handle",
                     size="3",
                     flex="1",
-                    background="rgba(255,255,255,0.06)",
-                    border="1px solid rgba(124,58,237,0.4)",
+                    background="#ffffff",
+                    border="1px solid #e2e2e2",
                     border_radius="12px",
-                    color="white",
-                    _placeholder={"color": "#4b5563"},
-                    _focus={"border_color": "#a855f7", "box_shadow": "0 0 0 3px rgba(168,85,247,0.2)"},
+                    color="#111827",
+                    _placeholder={"color": "#9ca3af"},
+                    _focus={"border_color": "#7c3aed", "box_shadow": "0 0 0 3px rgba(124,58,237,0.1)"},
                 ),
                 spacing="2",
                 width="100%",
@@ -106,19 +108,19 @@ def step_one() -> rx.Component:
         ),
 
         rx.vstack(
-            rx.text("Display Name", size="1", color="#a78bfa", weight="medium", letter_spacing="1px"),
+            rx.text("Display Name", size="1", color="#7c3aed", weight="medium", letter_spacing="1px"),
             rx.input(
                 value=ProfileState.display_name_input,
                 on_change=ProfileState.set_display_name_input,
                 placeholder="Your full name or nickname",
                 size="3",
                 width="100%",
-                background="rgba(255,255,255,0.06)",
-                border="1px solid rgba(124,58,237,0.4)",
+                background="#ffffff",
+                border="1px solid #e2e2e2",
                 border_radius="12px",
-                color="white",
-                _placeholder={"color": "#4b5563"},
-                _focus={"border_color": "#a855f7", "box_shadow": "0 0 0 3px rgba(168,85,247,0.2)"},
+                color="#111827",
+                _placeholder={"color": "#9ca3af"},
+                _focus={"border_color": "#7c3aed", "box_shadow": "0 0 0 3px rgba(124,58,237,0.1)"},
             ),
             rx.text(
                 "This is how your name appears on your profile",
@@ -135,15 +137,15 @@ def step_one() -> rx.Component:
 
 def step_two() -> rx.Component:
     def field_label(text: str) -> rx.Component:
-        return rx.text(text, size="1", color="#a78bfa", weight="medium", letter_spacing="1px")
+        return rx.text(text, size="1", color="#7c3aed", weight="medium", letter_spacing="1px")
 
     input_style = {
-        "background": "rgba(255,255,255,0.06)",
-        "border": "1px solid rgba(124,58,237,0.4)",
+        "background": "#ffffff",
+        "border": "1px solid #e2e2e2",
         "border_radius": "12px",
-        "color": "white",
-        "_placeholder": {"color": "#4b5563"},
-        "_focus": {"border_color": "#a855f7", "box_shadow": "0 0 0 3px rgba(168,85,247,0.2)"},
+        "color": "#111827",
+        "_placeholder": {"color": "#9ca3af"},
+        "_focus": {"border_color": "#7c3aed", "box_shadow": "0 0 0 3px rgba(124,58,237,0.1)"},
     }
 
     return rx.vstack(
@@ -210,7 +212,77 @@ def step_two() -> rx.Component:
     )
 
 
-# ─── Step 3: Privacy + finish ──────────────────────────────────────────────────
+# ─── Step 3: Avatar + Banner ───────────────────────────────────────────────────
+
+def step_media() -> rx.Component:
+    return rx.vstack(
+        rx.hstack(
+            rx.vstack(
+                rx.text("Avatar", size="1", color="#7c3aed", weight="medium", letter_spacing="1px"),
+                rx.upload(
+                    rx.cond(
+                        ProfileState.own_avatar != "",
+                        rx.image(
+                            src=ProfileState.own_avatar_url,
+                            width="100px", height="100px",
+                            border_radius="50%", object_fit="cover",
+                        ),
+                        rx.center(
+                            rx.icon("user", size=32, color="#d1d5db"),
+                            width="100px", height="100px",
+                            border_radius="50%", background="#f3f4f6",
+                        ),
+                    ),
+                    id="avatar_upload",
+                    on_drop=ProfileState.handle_avatar_upload(rx.upload_files(upload_id="avatar_upload")),
+                    border="none",
+                    padding="0",
+                    border_radius="50%",
+                ),
+                rx.text("Click to Change", size="1", color="#6b7280"),
+                spacing="2", align="center",
+            ),
+            rx.vstack(
+                rx.text("Profile Banner", size="1", color="#7c3aed", weight="medium", letter_spacing="1px"),
+                rx.upload(
+                    rx.cond(
+                        ProfileState.own_banner != "",
+                        rx.image(
+                            src=ProfileState.own_banner_url,
+                            width="300px", height="100px",
+                            border_radius="12px", object_fit="cover",
+                        ),
+                        rx.center(
+                            rx.icon("image", size=32, color="#d1d5db"),
+                            width="300px", height="100px",
+                            border_radius="12px", background="#f3f4f6",
+                        ),
+                    ),
+                    id="banner_upload",
+                    on_drop=ProfileState.handle_banner_upload(rx.upload_files(upload_id="banner_upload")),
+                    border="none",
+                    padding="0",
+                    border_radius="12px",
+                ),
+                rx.text("Ideal: 1200x400", size="1", color="#6b7280"),
+                spacing="2", align="center",
+            ),
+            spacing="6", align="center", width="100%",
+        ),
+        rx.cond(
+            ProfileState.avatar_error != "",
+            rx.text(ProfileState.avatar_error, size="1", color="#ef4444"),
+            rx.cond(
+                ProfileState.banner_error != "",
+                rx.text(ProfileState.banner_error, size="1", color="#ef4444"),
+                rx.box(),
+            ),
+        ),
+        spacing="5", width="100%",
+    )
+
+
+# ─── Step 4: Privacy + finish ──────────────────────────────────────────────────
 
 def step_three() -> rx.Component:
     return rx.vstack(
@@ -218,11 +290,19 @@ def step_three() -> rx.Component:
         rx.box(
             rx.vstack(
                 rx.hstack(
-                    # Initials avatar
+                    # Avatar (Initials or Uploaded)
                     rx.box(
-                        rx.text(
-                            ProfileState.own_initials,
-                            size="5", weight="bold", color="white",
+                        rx.cond(
+                            ProfileState.own_avatar != "",
+                            rx.image(
+                                src=ProfileState.own_avatar_url,
+                                width="64px", height="64px",
+                                border_radius="50%", object_fit="cover",
+                            ),
+                            rx.text(
+                                ProfileState.own_initials,
+                                size="5", weight="bold", color="white",
+                            ),
                         ),
                         width="64px", height="64px",
                         border_radius="50%",
@@ -230,17 +310,17 @@ def step_three() -> rx.Component:
                         display="flex",
                         align_items="center",
                         justify_content="center",
-                        box_shadow="0 4px 20px rgba(124,58,237,0.5)",
+                        box_shadow="0 4px 20px rgba(124,58,237,0.3)",
                     ),
                     rx.vstack(
                         rx.hstack(
-                            rx.text(ProfileState.display_name_input, size="4", weight="bold", color="white"),
+                            rx.text(ProfileState.display_name_input, size="4", weight="bold", color="#111827"),
                             spacing="0",
                         ),
-                        rx.text("@" + ProfileState.username_input, size="2", color="#a78bfa"),
+                        rx.text("@", ProfileState.username_input, size="2", color="#7c3aed"),
                         rx.cond(
                             ProfileState.bio_input != "",
-                            rx.text(ProfileState.bio_input, size="2", color="#9ca3af", max_width="200px",
+                            rx.text(ProfileState.bio_input, size="2", color="#4b5563", max_width="200px",
                                     overflow="hidden", text_overflow="ellipsis", white_space="nowrap"),
                             rx.box(),
                         ),
@@ -251,8 +331,8 @@ def step_three() -> rx.Component:
                 spacing="3",
             ),
             padding="20px 24px",
-            background="rgba(124,58,237,0.08)",
-            border="1px solid rgba(124,58,237,0.25)",
+            background="#f9fafb",
+            border="1px solid #f1f1f1",
             border_radius="16px",
             width="100%",
         ),
@@ -262,8 +342,8 @@ def step_three() -> rx.Component:
             rx.hstack(
                 rx.vstack(
                     rx.hstack(
-                        rx.icon("globe", size=16, color="#a78bfa"),
-                        rx.text("Public Library", size="3", weight="medium", color="white"),
+                        rx.icon("globe", size=16, color="#7c3aed"),
+                        rx.text("Public Library", size="3", weight="medium", color="#111827"),
                         spacing="2", align="center",
                     ),
                     rx.text(
@@ -282,8 +362,8 @@ def step_three() -> rx.Component:
                 width="100%",
             ),
             padding="16px 20px",
-            background="rgba(255,255,255,0.03)",
-            border="1px solid rgba(124,58,237,0.2)",
+            background="#ffffff",
+            border="1px solid #f1f1f1",
             border_radius="14px",
             width="100%",
         ),
@@ -313,8 +393,8 @@ def onboarding_modal() -> rx.Component:
             rx.box(
                 position="fixed", top="0", left="0",
                 width="100vw", height="100vh",
-                background="rgba(0,0,0,0.7)",
-                backdrop_filter="blur(8px)",
+                background="rgba(255,255,255,0.1)",
+                backdrop_filter="blur(16px)",
                 z_index="3000",
             ),
             # Wizard card
@@ -329,16 +409,16 @@ def onboarding_modal() -> rx.Component:
                                 background="linear-gradient(135deg, #7c3aed, #a855f7)",
                                 border_radius="10px",
                             ),
-                            rx.text("Welcome to turkey.app", size="2", color="#a78bfa"),
+                            rx.text("Welcome to turkey.app", size="2", color="#7c3aed"),
                             spacing="3", align="center",
                         ),
                         rx.heading(
                             ProfileState.step_title,
-                            size="6", color="white", text_align="center",
+                            size="6", color="#111827", text_align="center",
                         ),
                         rx.text(
                             ProfileState.step_subtitle,
-                            size="2", color="#9ca3af", text_align="center",
+                            size="2", color="#6b7280", text_align="center",
                             max_width="340px",
                         ),
                         step_indicator(),
@@ -346,7 +426,7 @@ def onboarding_modal() -> rx.Component:
                         align="center",
                     ),
 
-                    rx.divider(color="rgba(124,58,237,0.2)"),
+                    rx.divider(color="#f1f1f1"),
 
                     # Step content
                     rx.cond(
@@ -355,11 +435,15 @@ def onboarding_modal() -> rx.Component:
                         rx.cond(
                             ProfileState.onboarding_step == 2,
                             step_two(),
-                            step_three(),
+                            rx.cond(
+                                ProfileState.onboarding_step == 3,
+                                step_media(),
+                                step_three(),
+                            ),
                         ),
                     ),
 
-                    rx.divider(color="rgba(124,58,237,0.15)"),
+                    rx.divider(color="#f1f1f1"),
 
                     # Navigation buttons
                     rx.hstack(
@@ -378,7 +462,7 @@ def onboarding_modal() -> rx.Component:
                         ),
                         rx.spacer(),
                         rx.cond(
-                            ProfileState.onboarding_step < 3,
+                            ProfileState.onboarding_step < 4,
                             rx.button(
                                 "Continue",
                                 rx.icon("chevron-right", size=16),
@@ -400,7 +484,7 @@ def onboarding_modal() -> rx.Component:
                                 color="white",
                                 border_radius="12px",
                                 cursor="pointer",
-                                box_shadow="0 4px 20px rgba(124,58,237,0.5)",
+                                box_shadow="0 4px 20px rgba(124,58,237,0.4)",
                                 _hover={"opacity": "0.9", "transform": "translateY(-1px)"},
                                 transition="all 0.2s ease",
                             ),
@@ -413,15 +497,14 @@ def onboarding_modal() -> rx.Component:
                     width="100%",
                 ),
                 padding="40px",
-                background="rgba(8,4,22,0.98)",
-                border="1px solid rgba(124,58,237,0.3)",
+                background="#ffffff",
+                border="1px solid #e5e7eb",
                 border_radius="28px",
-                box_shadow="0 40px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(124,58,237,0.1)",
+                box_shadow="0 40px 80px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.02)",
                 width="520px",
                 max_width="95vw",
                 position="relative",
                 z_index="3001",
-                backdrop_filter="blur(24px)",
             ),
             position="fixed",
             top="0", left="0",

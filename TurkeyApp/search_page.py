@@ -1,15 +1,14 @@
-"""Search & Discovery page — /search"""
-
 import reflex as rx
 from TurkeyApp.profile_state import ProfileState
+from TurkeyApp.navbar import navbar
 
 
-# ── User result card ───────────────────────────────────────────────────────────
+
 
 def _avatar_circle() -> rx.Component:
     """Generic initials fallback avatar."""
     return rx.box(
-        rx.icon("user", size=22, color="white"),
+        rx.icon("user", size=22, color="#111827"),
         width="52px",
         height="52px",
         border_radius="50%",
@@ -29,7 +28,7 @@ def search_result_card(result: rx.Base) -> rx.Component:
             rx.cond(
                 result.avatar_url != "",
                 rx.image(
-                    src=rx.get_upload_url(result.avatar_url),
+                    src=result.full_avatar_url,
                     width="52px",
                     height="52px",
                     object_fit="cover",
@@ -42,8 +41,8 @@ def search_result_card(result: rx.Base) -> rx.Component:
             # Info
             rx.vstack(
                 rx.hstack(
-                    rx.text(result.display_name, size="3", weight="bold", color="white"),
-                    rx.text("@" + result.username, size="2", color="#a78bfa"),
+                    rx.text(result.display_name, size="3", weight="bold", color="#111827"),
+                    rx.text("@", result.username, size="2", color="#6b7280"),
                     spacing="2",
                     align="baseline",
                     flex_wrap="wrap",
@@ -77,8 +76,13 @@ def search_result_card(result: rx.Base) -> rx.Component:
                         spacing="1", align="center",
                     ),
                     rx.hstack(
+                        rx.icon("users", size=13, color="#6b7280"),
+                        rx.text(result.follower_count.to_string(), " followers", size="1", color="#6b7280"),
+                        spacing="1", align="center",
+                    ),
+                    rx.hstack(
                         rx.icon("calendar", size=13, color="#6b7280"),
-                        rx.text("Joined " + result.member_since, size="1", color="#6b7280"),
+                        rx.text("Joined ", result.member_since, size="1", color="#6b7280"),
                         spacing="1", align="center",
                     ),
                     spacing="4",
@@ -89,11 +93,11 @@ def search_result_card(result: rx.Base) -> rx.Component:
                 flex="1",
                 min_width="0",
             ),
-            # CTA
+       
             rx.button(
                 "View Profile",
                 rx.icon("arrow-right", size=14),
-                on_click=rx.redirect("/u/" + result.username),
+                on_click=ProfileState.goto_profile(result.username),
                 size="2",
                 background="linear-gradient(135deg, #7c3aed, #a855f7)",
                 color="white",
@@ -107,8 +111,8 @@ def search_result_card(result: rx.Base) -> rx.Component:
             width="100%",
         ),
         padding="20px 24px",
-        background="rgba(255,255,255,0.04)",
-        border="1px solid rgba(124,58,237,0.18)",
+        background="#f9fafb",
+        border="1px solid #f1f1f1",
         border_radius="16px",
         _hover={
             "border_color": "rgba(168,85,247,0.45)",
@@ -119,7 +123,7 @@ def search_result_card(result: rx.Base) -> rx.Component:
         transition="all 0.2s ease",
         width="100%",
         cursor="pointer",
-        on_click=rx.redirect("/u/" + result.username),
+        on_click=ProfileState.goto_profile(result.username),
     )
 
 
@@ -151,51 +155,14 @@ def _initial_state() -> rx.Component:
 
 # ── Navbar (re-used style) ──────────────────────────────────────────────────────
 
-def search_nav() -> rx.Component:
-    return rx.hstack(
-        rx.hstack(
-            rx.image(src="/turkey_icon.png", width="30px", height="30px", border_radius="8px"),
-            rx.hstack(
-                rx.text("turkey", size="3", weight="bold", color="white"),
-                rx.text(".app", size="3", weight="bold", color="#a855f7"),
-                spacing="0",
-            ),
-            spacing="2",
-            align="center",
-            cursor="pointer",
-            on_click=rx.redirect("/"),
-        ),
-        rx.hstack(
-            rx.button(
-                rx.icon("library-big", size=15),
-                "My Library",
-                on_click=rx.redirect("/library"),
-                size="2",
-                background="linear-gradient(135deg, #7c3aed, #a855f7)",
-                color="white",
-                border_radius="10px",
-                cursor="pointer",
-            ),
-        ),
-        justify="between",
-        align="center",
-        padding="0 24px",
-        height="56px",
-        background="rgba(5,2,16,0.9)",
-        border_bottom="1px solid rgba(124,58,237,0.15)",
-        backdrop_filter="blur(12px)",
-        position="sticky",
-        top="0",
-        z_index="100",
-        width="100%",
-    )
+
 
 
 # ── Full page ──────────────────────────────────────────────────────────────────
 
 def search_page() -> rx.Component:
     return rx.box(
-        search_nav(),
+        navbar(active_page="search"),
         rx.box(
             rx.vstack(
                 # Header
@@ -203,7 +170,7 @@ def search_page() -> rx.Component:
                     rx.heading(
                         "Discover People",
                         size="8",
-                        color="white",
+                        color="#111827",
                         weight="bold",
                         letter_spacing="-1px",
                         text_align="center",
@@ -218,20 +185,24 @@ def search_page() -> rx.Component:
                     align="center",
                 ),
 
-                # Search bar
+              
                 rx.box(
                     rx.hstack(
                         rx.icon("search", size=20, color="#6b7280", flex_shrink="0"),
                         rx.input(
                             value=ProfileState.search_query,
                             on_change=ProfileState.set_search_query,
-                        on_key_up=ProfileState.run_search,
+                        on_key_up=lambda key: rx.cond(
+                                key == "Enter",
+                                ProfileState.run_search,
+                                rx.noop(),
+                            ),
                             placeholder="Search by username or name…",
                             size="3",
                             flex="1",
                             background="transparent",
                             border="none",
-                            color="white",
+                            color="#111827",
                             _placeholder={"color": "#6b7280"},
                             _focus={"outline": "none", "border": "none", "box_shadow": "none"},
                         ),
@@ -255,15 +226,15 @@ def search_page() -> rx.Component:
                         width="100%",
                     ),
                     padding="14px 20px",
-                    background="rgba(255,255,255,0.05)",
-                    border="1px solid rgba(124,58,237,0.35)",
-                    border_radius="16px",
+                    background="#f1f1f1",
+                    border="1px solid #e2e2e2",
+                    border_radius="99px",
                     width="100%",
                     max_width="620px",
-                    backdrop_filter="blur(12px)",
                     _focus_within={
-                        "border_color": "rgba(168,85,247,0.7)",
-                        "box_shadow": "0 0 0 3px rgba(124,58,237,0.2)",
+                        "background": "#ffffff",
+                        "border_color": "#111827",
+                        "box_shadow": "0 0 0 3px rgba(0,0,0,0.05)",
                     },
                     transition="all 0.2s ease",
                 ),
@@ -279,8 +250,7 @@ def search_page() -> rx.Component:
                                 ProfileState.search_results.length() > 0,
                                 rx.vstack(
                                     rx.text(
-                                        ProfileState.search_results.length().to_string()
-                                        + " profile(s) found",
+                                        ProfileState.search_results.length().to_string(), " profile(s) found",
                                         size="2",
                                         color="#6b7280",
                                         align_self="start",
@@ -291,7 +261,30 @@ def search_page() -> rx.Component:
                                 ),
                                 _empty_state(),
                             ),
-                            _initial_state(),
+                            # Suggestions (initial state)
+                            rx.vstack(
+                                rx.hstack(
+                                    rx.icon("sparkles", size=18, color="#a855f7"),
+                                    rx.text("Suggested for you", size="3", weight="bold", color="#111827"),
+                                    spacing="2", align="center",
+                                    width="100%",
+                                    margin_top="20px",
+                                ),
+                                rx.cond(
+                                    ProfileState.suggested_loading,
+                                    rx.center(rx.spinner(size="2", color="#a855f7"), padding_y="30px"),
+                                    rx.cond(
+                                        ProfileState.suggested_creators.length() > 0,
+                                        rx.vstack(
+                                            rx.foreach(ProfileState.suggested_creators, search_result_card),
+                                            spacing="3",
+                                            width="100%",
+                                        ),
+                                        _initial_state(),
+                                    ),
+                                ),
+                                spacing="4", width="100%",
+                            ),
                         ),
                     ),
                     width="100%",
@@ -310,6 +303,6 @@ def search_page() -> rx.Component:
             justify_content="center",
         ),
         min_height="100vh",
-        background="radial-gradient(ellipse at top, #130a2e 0%, #050210 50%, #020108 100%)",
+        background="#ffffff",
         width="100%",
     )

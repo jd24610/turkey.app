@@ -28,7 +28,7 @@ def toast_notification() -> rx.Component:
                     UploadState.upload_message,
                     size="2",
                     weight="medium",
-                    color="white",
+                    color="#111827",
                     flex="1",
                 ),
                 rx.button(
@@ -37,6 +37,7 @@ def toast_notification() -> rx.Component:
                     size="1",
                     variant="ghost",
                     color_scheme="gray",
+                    color="#6b7280",
                     flex_shrink="0",
                 ),
                 spacing="3",
@@ -51,8 +52,9 @@ def toast_notification() -> rx.Component:
             max_width="400px",
             padding="14px 18px",
             border_radius="14px",
-            background="rgba(12,7,30,0.97)",
-            backdrop_filter="blur(16px)",
+            background="#ffffff",
+            border="1px solid #e5e7eb",
+            box_shadow="0 10px 40px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.02)",
             border_left=rx.cond(
                 UploadState.upload_status == "success",
                 "4px solid #22c55e",
@@ -62,10 +64,6 @@ def toast_notification() -> rx.Component:
                     "4px solid #ef4444",
                 ),
             ),
-            border_top="1px solid rgba(255,255,255,0.07)",
-            border_right="1px solid rgba(255,255,255,0.07)",
-            border_bottom="1px solid rgba(255,255,255,0.07)",
-            box_shadow="0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(124,58,237,0.1)",
         ),
         rx.box(),
     )
@@ -133,28 +131,28 @@ def duplicate_modal() -> rx.Component:
                 rx.vstack(
                     rx.hstack(
                         rx.icon("copy", size=24, color="#f59e0b"),
-                        rx.heading("Duplicate Images Detected", size="5", color="white"),
+                        rx.heading("Duplicate Images Detected", size="5", color="#111827"),
                         spacing="3",
                         align="center",
                     ),
                     rx.text(
                         "The following files already exist in your library:",
                         size="3",
-                        color="#c4b5fd",
+                        color="#4b5563",
                     ),
                     rx.box(
                         rx.foreach(
                             UploadState.pending_duplicates,
                             lambda name: rx.hstack(
                                 rx.icon("image", size=14, color="#f59e0b"),
-                                rx.text(name, size="2", color="#fde68a"),
+                                rx.text(name, size="2", color="#92400e"),
                                 spacing="2",
                                 align="center",
                             ),
                         ),
                         padding="12px 16px",
-                        background="rgba(245,158,11,0.1)",
-                        border="1px solid rgba(245,158,11,0.25)",
+                        background="#fef3c7",
+                        border="1px solid #fde68a",
                         border_radius="10px",
                         width="100%",
                         max_height="200px",
@@ -163,7 +161,7 @@ def duplicate_modal() -> rx.Component:
                     rx.text(
                         "Do you want to overwrite these files?",
                         size="3",
-                        color="#e2e8f0",
+                        color="#111827",
                         weight="medium",
                     ),
                     rx.hstack(
@@ -188,19 +186,19 @@ def duplicate_modal() -> rx.Component:
                     width="100%",
                 ),
                 padding="32px",
-                background="rgba(15,10,40,0.98)",
-                border="1px solid rgba(124,58,237,0.4)",
+                background="#ffffff",
+                border="1px solid #e5e7eb",
                 border_radius="20px",
                 width="480px",
-                box_shadow="0 25px 60px rgba(0,0,0,0.7)",
+                box_shadow="0 25px 60px rgba(0,0,0,0.15)",
             ),
             position="fixed",
             top="0",
             left="0",
             width="100vw",
             height="100vh",
-            background="rgba(0,0,0,0.6)",
-            backdrop_filter="blur(6px)",
+            background="rgba(0,0,0,0.1)",
+            backdrop_filter="blur(4px)",
             display="flex",
             align_items="center",
             justify_content="center",
@@ -214,7 +212,32 @@ def lightbox_modal() -> rx.Component:
     """Fullscreen image preview with metadata sidebar and prev/next navigation."""
     return rx.cond(
         UploadState.show_preview,
-        rx.box(
+        rx.el.div(
+            # ── Hidden key-capture input (auto-focused for keyboard nav) ──
+            rx.input(
+                auto_focus=True,
+                read_only=True,
+                style={
+                    "position": "absolute",
+                    "opacity": "0",
+                    "width": "0",
+                    "height": "0",
+                    "pointer_events": "none",
+                },
+                on_key_down=lambda key: rx.cond(
+                    key == "ArrowLeft",
+                    UploadState.prev_image,
+                    rx.cond(
+                        key == "ArrowRight",
+                        UploadState.next_image,
+                        rx.cond(
+                            key == "Escape",
+                            UploadState.close_preview,
+                            rx.noop(),
+                        ),
+                    ),
+                ),
+            ),
             # ── Dark backdrop (click outside to close) ──
             rx.box(
                 position="absolute",
@@ -263,10 +286,10 @@ def lightbox_modal() -> rx.Component:
                             rx.hstack(
                                 # filename
                                 rx.hstack(
-                                    rx.icon("image", size=14, color="#a78bfa"),
+                                    rx.icon("image", size=14, color="#7c3aed"),
                                     rx.text(
                                         UploadState.lightbox_name,
-                                        size="2", weight="medium", color="white",
+                                        size="2", weight="medium", color="#111827",
                                         max_width="240px",
                                         overflow="hidden",
                                         text_overflow="ellipsis",
@@ -345,7 +368,7 @@ def lightbox_modal() -> rx.Component:
                                 spacing="3",
                                 align="center",
                                 width="100%",
-                                border_top="1px solid rgba(255,255,255,0.06)",
+                                border_top="1px solid rgba(0,0,0,0.06)",
                                 padding_top="8px",
                             ),
                             # ── Caption row (always editable) ──
@@ -360,16 +383,24 @@ def lightbox_modal() -> rx.Component:
                                         placeholder="Add a caption…",
                                         size="1",
                                         flex="1",
-                                        background="rgba(255,255,255,0.08)",
-                                        border="1px solid rgba(168,85,247,0.5)",
+                                        background="rgba(0,0,0,0.05)",
+                                        border="1px solid rgba(124,58,237,0.3)",
                                         border_radius="8px",
-                                        color="white",
+                                        color="#111827",
                                         _placeholder={"color": "#6b7280"},
-                                        _focus={"outline": "none", "border_color": "#a855f7"},
-                                        on_key_down=rx.cond(
-                                            UploadState.lightbox_caption_draft != "",
-                                            UploadState.save_lightbox_caption,
-                                            UploadState.cancel_edit_caption,
+                                        _focus={"outline": "none", "border_color": "#7c3aed"},
+                                        on_key_down=lambda key: rx.cond(
+                                            key == "Enter",
+                                            rx.cond(
+                                                UploadState.lightbox_caption_draft != "",
+                                                UploadState.save_lightbox_caption,
+                                                UploadState.cancel_edit_caption,
+                                            ),
+                                            rx.cond(
+                                                key == "Escape",
+                                                UploadState.cancel_edit_caption,
+                                                rx.noop(),
+                                            ),
                                         ),
                                     ),
                                     rx.button(
@@ -400,7 +431,7 @@ def lightbox_modal() -> rx.Component:
                                         size="1",
                                         color=rx.cond(
                                             UploadState.lightbox_caption != "",
-                                            "#d1d5db",
+                                            "#111827",
                                             "#4b5563",
                                         ),
                                         font_style=rx.cond(
@@ -425,7 +456,7 @@ def lightbox_modal() -> rx.Component:
                             width="100%",
                         ),
                         padding="12px 18px",
-                        background="rgba(8,4,22,0.92)",
+                        background="rgba(255,255,255,0.92)",
                         border_radius="10px",
                         border="1px solid rgba(124,58,237,0.2)",
                         backdrop_filter="blur(12px)",
@@ -523,7 +554,7 @@ def image_card(img: rx.Base) -> rx.Component:
                     ),
                     rx.box(),
                 ),
-                # 🌐 Public badge (top-left)
+                # 🌐/🔒 Visibility toggle (top-left) — click to flip
                 rx.cond(
                     img.is_public,
                     rx.box(
@@ -532,14 +563,38 @@ def image_card(img: rx.Base) -> rx.Component:
                         top="8px", left="8px",
                         background="rgba(34,197,94,0.85)",
                         border_radius="999px",
-                        padding="3px 7px",
+                        padding="3px 8px",
                         display="flex",
                         align_items="center",
                         justify_content="center",
                         backdrop_filter="blur(4px)",
                         border="1px solid rgba(255,255,255,0.2)",
+                        cursor="pointer",
+                        title="Public — click to make private",
+                        _hover={"background": "rgba(239,68,68,0.75)"},
+                        transition="background 0.2s ease",
+                        on_click=UploadState.toggle_image_public(img.id),
+                        z_index="3",
                     ),
-                    rx.box(),
+                    rx.box(
+                        rx.icon("lock", size=12, color="white"),
+                        position="absolute",
+                        top="8px", left="8px",
+                        background="rgba(107,114,128,0.8)",
+                        border_radius="999px",
+                        padding="3px 8px",
+                        display="flex",
+                        align_items="center",
+                        justify_content="center",
+                        backdrop_filter="blur(4px)",
+                        border="1px solid rgba(255,255,255,0.15)",
+                        cursor="pointer",
+                        title="Private — click to make public",
+                        _hover={"background": "rgba(34,197,94,0.75)"},
+                        transition="background 0.2s ease",
+                        on_click=UploadState.toggle_image_public(img.id),
+                        z_index="3",
+                    ),
                 ),
                 width="100%",
                 overflow="hidden",
@@ -556,7 +611,7 @@ def image_card(img: rx.Base) -> rx.Component:
                     img.original_filename,
                     size="2",
                     weight="bold",
-                    color="white",
+                    color="#111827",
                     white_space="nowrap",
                     overflow="hidden",
                     text_overflow="ellipsis",
@@ -565,8 +620,8 @@ def image_card(img: rx.Base) -> rx.Component:
                 rx.cond(
                     img.folder_name != "",
                     rx.hstack(
-                        rx.icon("folder", size=12, color="#a78bfa"),
-                        rx.text(img.folder_name, size="1", color="#a78bfa"),
+                        rx.icon("folder", size=12, color="#7c3aed"),
+                        rx.text(img.folder_name, size="1", color="#7c3aed"),
                         spacing="1",
                         align="center",
                     ),
@@ -599,10 +654,10 @@ def image_card(img: rx.Base) -> rx.Component:
                 ),
                 size="1",
                 width="100%",
-                background="rgba(255,255,255,0.06)",
-                border="1px solid rgba(124,58,237,0.3)",
+                background="#ffffff",
+                border="1px solid #e5e7eb",
                 border_radius="8px",
-                color="#a78bfa",
+                color="#7c3aed",
             ),
             # ── Assigned tag badges (FIXED: uses .contains()) ──
             rx.foreach(
@@ -615,7 +670,7 @@ def image_card(img: rx.Base) -> rx.Component:
                             border_radius="50%",
                             background=t.color,
                         ),
-                        rx.text(t.name, size="1", color="white"),
+                        rx.text(t.name, size="1", color="#111827"),
                         rx.icon(
                             "x",
                             size=10,
@@ -626,9 +681,9 @@ def image_card(img: rx.Base) -> rx.Component:
                         spacing="1",
                         align="center",
                         padding="3px 8px",
-                        background="rgba(124,58,237,0.18)",
+                        background="#f3f4f6",
                         border_radius="999px",
-                        border="1px solid rgba(124,58,237,0.3)",
+                        border="1px solid #e5e7eb",
                     ),
                     rx.box(),
                 ),
@@ -640,10 +695,10 @@ def image_card(img: rx.Base) -> rx.Component:
                 on_change=lambda f: UploadState.assign_folder(img.id, f),
                 size="1",
                 width="100%",
-                background="rgba(255,255,255,0.06)",
-                border="1px solid rgba(124,58,237,0.3)",
+                background="#ffffff",
+                border="1px solid #e5e7eb",
                 border_radius="8px",
-                color="#a78bfa",
+                color="#7c3aed",
             ),
             # ── Delete ──
             rx.button(
@@ -660,19 +715,19 @@ def image_card(img: rx.Base) -> rx.Component:
             width="100%",
         ),
         padding="16px",
-        background="rgba(255,255,255,0.04)",
+        background="#ffffff",
         border=rx.cond(
             UploadState.selected_image_ids.contains(img.id),
-            "2px solid #a855f7",
-            "1px solid rgba(124,58,237,0.2)",
+            "2px solid #7c3aed",
+            "1px solid #f1f1f1",
         ),
         border_radius="16px",
         width=UploadState.card_width,
         _hover={
-            "border_color": "rgba(124,58,237,0.5)",
-            "background": "rgba(124,58,237,0.08)",
+            "border_color": "#7c3aed",
+            "background": "#f9fafb",
             "transform": "translateY(-2px)",
-            "box_shadow": "0 8px 30px rgba(124,58,237,0.2)",
+            "box_shadow": "0 8px 30px rgba(0,0,0,0.05)",
         },
         transition="all 0.2s ease",
     )
@@ -697,7 +752,7 @@ def image_list_row(img: rx.Base) -> rx.Component:
             img.original_filename,
             size="2",
             weight="medium",
-            color="white",
+            color="#111827",
             flex="1",
             overflow="hidden",
             text_overflow="ellipsis",
@@ -707,12 +762,12 @@ def image_list_row(img: rx.Base) -> rx.Component:
         rx.cond(
             img.folder_name != "",
             rx.hstack(
-                rx.icon("folder", size=12, color="#a78bfa"),
-                rx.text(img.folder_name, size="1", color="#a78bfa", white_space="nowrap"),
+                rx.icon("folder", size=12, color="#7c3aed"),
+                rx.text(img.folder_name, size="1", color="#7c3aed", white_space="nowrap"),
                 spacing="1",
                 align="center",
             ),
-            rx.text("—", size="1", color="#4b5563"),
+            rx.text("—", size="1", color="#9ca3af"),
         ),
         rx.cond(
             img.is_large,
@@ -742,19 +797,59 @@ def image_list_row(img: rx.Base) -> rx.Component:
         spacing="4",
         align="center",
         width="100%",
-        padding="10px 16px",
-        background="rgba(255,255,255,0.03)",
-        border="1px solid rgba(124,58,237,0.12)",
+        padding="8px 12px",
         border_radius="10px",
-        _hover={"background": "rgba(124,58,237,0.07)", "border_color": "rgba(124,58,237,0.3)"},
-        transition="all 0.15s ease",
+        _hover={"background": "#f9fafb"},
+        transition="background 0.2s ease",
+    )
+
+def tag_row(t: rx.Base) -> rx.Component:
+    return rx.hstack(
+        rx.box(width="12px", height="12px", border_radius="50%", background=t.color),
+        rx.text(t.name, size="2", color="#111827", flex="1"),
+        rx.button(
+            rx.icon("trash-2", size=12),
+            on_click=UploadState.delete_tag(t.id),
+            size="1",
+            variant="ghost",
+            color_scheme="red",
+        ),
+        spacing="2",
+        align="center",
+        width="100%",
+        padding="6px 8px",
+        border_radius="8px",
+        _hover={"background": "#f9fafb"},
+        transition="background 0.2s ease",
     )
 
 def folder_chip(folder: str) -> rx.Component:
+    is_public = UploadState.public_folders.contains(folder)
     return rx.box(
         rx.hstack(
-            rx.icon("folder", size=14, color="#a78bfa"),
-            rx.text(folder, size="2", color="#e2e8f0"),
+            rx.hstack(
+                rx.icon("folder", size=14, color=UploadState.accent_hex),
+                rx.text(folder, size="2", color="#111827", flex="1"),
+                spacing="2",
+                align="center",
+                cursor="pointer",
+                on_click=UploadState.set_folder_filter(folder),
+            ),
+            rx.spacer(),
+            # Public/Private Toggle
+            rx.button(
+                rx.cond(
+                    is_public,
+                    rx.icon("globe", size=12, color="#22c55e"),
+                    rx.icon("lock", size=12, color="#6b7280"),
+                ),
+                on_click=lambda: UploadState.toggle_folder_public(folder),
+                size="1",
+                variant="ghost",
+                color_scheme=rx.cond(is_public, "green", "gray"),
+                title=rx.cond(is_public, "Public collection", "Private collection"),
+                cursor="pointer",
+            ),
             rx.button(
                 rx.icon("pencil", size=12),
                 on_click=UploadState.start_rename_folder(folder),
@@ -768,8 +863,8 @@ def folder_chip(folder: str) -> rx.Component:
                 on_click=UploadState.export_folder(folder),
                 size="1",
                 variant="ghost",
-                color_scheme="purple",
-                title="Export folder as ZIP",
+                color_scheme="green",
+                title="Download folder (ZIP)",
             ),
             rx.button(
                 rx.icon("trash-2", size=12),
@@ -779,27 +874,29 @@ def folder_chip(folder: str) -> rx.Component:
                 color_scheme="red",
                 title="Delete folder",
             ),
-            spacing="2",
+            spacing="1",
             align="center",
+            width="100%",
         ),
-        padding="8px 14px",
-        background="rgba(124,58,237,0.12)",
-        border="1px solid rgba(124,58,237,0.25)",
-        border_radius="999px",
-        cursor="pointer",
-        on_click=UploadState.set_folder_filter(folder),
-        _hover={"background": "rgba(124,58,237,0.22)"},
-        transition="all 0.15s ease",
+        padding="8px 12px",
+        background="#ffffff",
+        border="1px solid #f1f1f1",
+        border_radius="10px",
+        width="100%",
+        _hover={"background": "#f9fafb", "border_color": "#e2e2e2"},
+        transition="all 0.2s ease",
     )
 
 
 def folder_filter_btn(folder: str) -> rx.Component:
+    is_active = UploadState.folder_filter == folder
     return rx.button(
         folder,
         on_click=UploadState.set_folder_filter(folder),
         size="1",
-        variant=rx.cond(UploadState.folder_filter == folder, "solid", "ghost"),
+        variant=rx.cond(is_active, "solid", "ghost"),
         color_scheme="purple",
+        color=rx.cond(is_active, "white", "#6b7280"),
     )
 
 
@@ -829,7 +926,7 @@ def tag_row(tag: rx.Base) -> rx.Component:
             flex_shrink="0",
             
         ),
-        rx.text(tag.name, size="2", color="white", flex="1"),
+        rx.text(tag.name, size="2", color="#111827", flex="1"),
         rx.icon(
             "trash-2", size=14, color="#ef4444",
             cursor="pointer",
@@ -840,8 +937,8 @@ def tag_row(tag: rx.Base) -> rx.Component:
         width="100%",
         padding="6px 10px",
         border_radius="8px",
-        background="rgba(255,255,255,0.03)",
-        border="1px solid rgba(124,58,237,0.15)",
+        background="#f9fafb",
+        border="1px solid #e5e7eb",
     )
 
 
@@ -850,8 +947,8 @@ def tag_management_panel() -> rx.Component:
     return rx.box(
         rx.vstack(
             rx.hstack(
-                rx.icon("tag", size=18, color="#a78bfa"),
-                rx.text("Tags", size="3", weight="bold", color="white"),
+                rx.icon("tag", size=18, color=UploadState.accent_hex),
+                rx.text("Tags", size="3", weight="bold", color="#111827"),
                 spacing="2",
                 align="center",
             ),
@@ -862,10 +959,10 @@ def tag_management_panel() -> rx.Component:
                     value=UploadState.new_tag_name,
                     on_change=UploadState.set_new_tag_name,
                     size="2",
-                    background="rgba(255,255,255,0.06)",
-                    border="1px solid rgba(124,58,237,0.3)",
+                    background="#ffffff",
+                    border="1px solid #e2e2e2",
                     border_radius="10px",
-                    color="white",
+                    color="#111827",
                     flex="1",
                 ),
                 rx.input(
@@ -875,7 +972,7 @@ def tag_management_panel() -> rx.Component:
                     width="40px",
                     height="36px",
                     padding="2px",
-                    border="1px solid rgba(124,58,237,0.3)",
+                    border="1px solid #e2e2e2",
                     border_radius="8px",
                     background="transparent",
                     cursor="pointer",
@@ -899,10 +996,10 @@ def tag_management_panel() -> rx.Component:
                 value=UploadState.tag_search,
                 on_change=UploadState.set_tag_search,
                 size="1",
-                background="rgba(255,255,255,0.04)",
-                border="1px solid rgba(124,58,237,0.2)",
+                background="#f9fafb",
+                border="1px solid #e5e7eb",
                 border_radius="8px",
-                color="white",
+                color="#111827",
                 width="100%",
             ),
             # Tag list
@@ -923,8 +1020,8 @@ def tag_management_panel() -> rx.Component:
             width="100%",
         ),
         padding="24px",
-        background="rgba(255,255,255,0.03)",
-        border="1px solid rgba(124,58,237,0.2)",
+        background="#ffffff",
+        border="1px solid #f1f1f1",
         border_radius="20px",
         width="320px",
         flex_shrink="0",
@@ -943,21 +1040,10 @@ def upload_zone() -> rx.Component:
                     align="center",
                 ),
                 rx.vstack(
-                    rx.box(
-                        rx.icon("cloud_upload", size=48, color="#7c3aed"),
-                        padding="20px",
-                        background="rgba(124,58,237,0.1)",
-                        border_radius="50%",
-                    ),
-                    rx.text("Drag & drop images here", size="4", weight="bold", color="white"),
-                    rx.text("or click to browse", size="2", color="#6b7280"),
-                    rx.hstack(
-                        rx.badge("JPG", color_scheme="purple"),
-                        rx.badge("PNG", color_scheme="purple"),
-                        rx.badge("Max 10 MB", color_scheme="gray"),
-                        spacing="2",
-                    ),
-                    spacing="3",
+                    rx.icon("cloud-upload", size=48, color=UploadState.accent_hex, opacity="0.6"),
+                    rx.text("Drop images here or click to browse", size="3", color="#111827", weight="medium"),
+                    rx.text("PNG, JPG, GIF or WEBP · up to 10MB each", size="2", color="#6b7280"),
+                    spacing="2",
                     align="center",
                 ),
             ),
@@ -966,23 +1052,24 @@ def upload_zone() -> rx.Component:
             min_height="200px",
             width="100%",
         ),
-        id="image-upload",
+        id="upload_dropzone",
         multiple=True,
         accept={
             "image/jpeg": [".jpg", ".jpeg"],
             "image/png": [".png"],
+            "image/gif": [".gif"],
+            "image/webp": [".webp"],
         },
-        on_drop=UploadState.handle_upload(rx.upload_files(upload_id="image-upload")),
-        border="2px dashed rgba(124,58,237,0.4)",
-        border_radius="20px",
-        padding="0",
-        background="rgba(124,58,237,0.04)",
-        width="100%",
-        _hover={
-            "border_color": "rgba(168,85,247,0.7)",
-            "background": "rgba(124,58,237,0.1)",
-        },
+        max_files=50,
+        on_drop=UploadState.handle_upload(rx.upload_files(upload_id="upload_dropzone")),
+        border="2px dashed #e2e8f0",
+        padding="40px",
+        border_radius="16px",
+        background="#ffffff",
+        _hover={"border_color": UploadState.accent_hex, "background": "#f9fafb"},
         transition="all 0.2s ease",
+        cursor="pointer",
+        width="100%",
     )
 
 
@@ -990,13 +1077,13 @@ def upload_zone() -> rx.Component:
 #  Extra components
 # ─────────────────────────────────────────────
 
-# Theme / accent preset data
+# ── Preferences panel data ────────────────────────────────────────────────────────────────
 _THEMES = [
+    ("Snow",       "#ffffff", "#f3f4f6", "#ffffff"),
+    ("Cloud",      "#f9fafb", "#f3f4f6", "#f9fafb"),
     ("Deep Space", "#1a0a3e", "#3d1a7a", "radial-gradient(ellipse at 20% 0%, #1a0a3e 0%, #080514 60%, #030208 100%)"),
     ("Midnight",   "#0a1438", "#1a2a5e", "radial-gradient(ellipse at 20% 0%, #0a1438 0%, #050a19 60%, #020408 100%)"),
     ("Void",       "#111111", "#222222", "linear-gradient(160deg, #141414 0%, #060606 100%)"),
-    ("Slate",      "#1a1a2e", "#2a2a4e", "radial-gradient(ellipse at 20% 0%, #1a1a2e 0%, #0f0f18 60%, #070714 100%)"),
-    ("Forest",     "#0a2420", "#1a4440", "radial-gradient(ellipse at 20% 0%, #0a2420 0%, #051413 60%, #020808 100%)"),
 ]
 _ACCENTS = [
     ("Violet", "#7c3aed", "#a855f7"),
@@ -1008,246 +1095,299 @@ _ACCENTS = [
 
 
 def _theme_swatch(name: str, dark: str, mid: str, gradient: str) -> rx.Component:
+    is_active = UploadState.bg_theme == gradient
     return rx.tooltip(
         rx.box(
-            width="38px",
-            height="38px",
-            border_radius="10px",
+            # Checkmark shown when active
+            rx.cond(
+                is_active,
+                rx.center(
+                    rx.icon("check", size=14, color="white"),
+                    position="absolute",
+                    top="0", left="0",
+                    width="100%", height="100%",
+                    background="rgba(0,0,0,0.35)",
+                    border_radius="12px",
+                ),
+                rx.box(),
+            ),
+            position="relative",
+            width="44px",
+            height="44px",
+            border_radius="12px",
             background=f"linear-gradient(135deg, {mid} 0%, {dark} 100%)",
             border=rx.cond(
-                UploadState.bg_theme == gradient,
-                "2px solid white",
-                "2px solid rgba(255,255,255,0.1)",
+                is_active,
+                "2.5px solid white",
+                "2.5px solid rgba(255,255,255,0.08)",
             ),
             cursor="pointer",
             on_click=UploadState.set_bg_theme(gradient),
-            _hover={"transform": "scale(1.12)", "border_color": "rgba(255,255,255,0.6)"},
-            transition="all 0.15s ease",
-            box_shadow="0 2px 8px rgba(0,0,0,0.4)",
+            _hover={"transform": "scale(1.1)", "border_color": "rgba(255,255,255,0.5)", "z_index": "1"},
+            transition="all 0.18s ease",
+            box_shadow=rx.cond(
+                is_active,
+                f"0 0 0 3px {mid}55, 0 4px 14px rgba(0,0,0,0.5)",
+                "0 3px 10px rgba(0,0,0,0.5)",
+            ),
         ),
         content=name,
     )
 
 
 def _accent_swatch(name: str, main: str, light: str) -> rx.Component:
+    is_active = UploadState.accent_hex == main
     return rx.tooltip(
         rx.box(
-            width="34px",
-            height="34px",
+            rx.cond(
+                is_active,
+                rx.center(
+                    rx.icon("check", size=13, color="white"),
+                    position="absolute",
+                    top="0", left="0",
+                    width="100%", height="100%",
+                    border_radius="50%",
+                ),
+                rx.box(),
+            ),
+            position="relative",
+            width="38px",
+            height="38px",
             border_radius="50%",
             background=f"linear-gradient(135deg, {main}, {light})",
             border=rx.cond(
-                UploadState.accent_hex == main,
+                is_active,
                 "2.5px solid white",
-                "2.5px solid rgba(255,255,255,0.1)",
+                "2.5px solid rgba(255,255,255,0.08)",
             ),
             cursor="pointer",
             on_click=UploadState.set_accent(main, light),
-            _hover={"transform": "scale(1.15)"},
-            transition="all 0.15s ease",
-            box_shadow=f"0 2px 10px {main}66",
+            _hover={"transform": "scale(1.15)", "border_color": f"{light}"},
+            transition="all 0.18s ease",
+            box_shadow=rx.cond(
+                is_active,
+                f"0 0 0 3px {main}55, 0 4px 14px {main}66",
+                f"0 3px 10px {main}44",
+            ),
         ),
         content=name,
     )
 
 
-def _pref_row(label: str, control: rx.Component) -> rx.Component:
+def _pref_row(label: str, control: rx.Component, sublabel: str = "") -> rx.Component:
     return rx.hstack(
-        rx.text(label, size="2", color="#c4b5fd", flex="1"),
+        rx.vstack(
+            rx.text(label, size="2", color="#111827", weight="medium"),
+            rx.cond(
+                sublabel != "",
+                rx.text(sublabel, size="1", color="#6b7280"),
+                rx.box(),
+            ),
+            spacing="0", align="start",
+        ),
+        rx.spacer(),
         control,
-        justify="between",
         align="center",
         width="100%",
-        padding="10px 0",
-        border_bottom="1px solid rgba(124,58,237,0.08)",
+        padding="12px 16px",
+        border_radius="10px",
+        _hover={"background": "#f1f1f1"},
+        transition="all 0.2s ease",
     )
 
 
+def _section_header(title: str) -> rx.Component:
+    return rx.text(
+        title,
+        size="2",
+        weight="bold",
+        color="#6b7280",
+        padding="16px 16px 8px 16px",
+    )
+
+
+
 def settings_panel() -> rx.Component:
-    """Pinterest-style slide-in preferences drawer."""
+    """Slide-in Preferences drawer."""
     return rx.cond(
         UploadState.settings_open,
         rx.box(
-            # ─ Backdrop ─────────────────────
+            # ─ Backdrop ──────────────────────────────────────────────────
             rx.box(
                 position="fixed", top="0", left="0",
                 width="100vw", height="100vh",
-                background="rgba(0,0,0,0.45)",
-                backdrop_filter="blur(3px)",
-                z_index="199",
+                background="rgba(0,0,0,0.1)",
+                z_index="1499",
                 on_click=UploadState.close_settings,
             ),
-            # ─ Panel ───────────────────────
+            # ─ Panel ─────────────────────────────────────────────────────
             rx.box(
                 rx.vstack(
-                    # Header
+
+                    # ── Header ───────────────────────────────────────────
                     rx.hstack(
-                        rx.hstack(
-                            rx.icon("settings", size=20, color="#a78bfa"),
-                            rx.text("Preferences", size="5", weight="bold", color="white"),
-                            spacing="3", align="center",
-                        ),
+                        rx.heading("Settings & Support", size="5", weight="bold", color="#111827"),
                         rx.button(
-                            rx.icon("x", size=18),
+                            rx.icon("x", size=20),
                             on_click=UploadState.close_settings,
-                            size="1", variant="ghost", color_scheme="purple",
+                            size="2", variant="ghost",
+                            color="#111827",
+                            border_radius="50%",
+                            cursor="pointer",
+                            _hover={"background": "rgba(0,0,0,0.05)"},
                         ),
                         justify="between", width="100%", align="center",
+                        padding="12px 16px",
+                        border_bottom="1px solid #f1f1f1",
                     ),
-                    rx.divider(color="rgba(124,58,237,0.25)"),
 
-                    # ――― Appearance Section ―――
-                    rx.vstack(
-                        rx.text("APPEARANCE", size="1", weight="bold", color="#4b5563", letter_spacing="1.5px"),
+                    rx.box(
                         rx.vstack(
-                            rx.text("Background Theme", size="2", color="#c4b5fd"),
-                            rx.hstack(
-                                *[_theme_swatch(n, d, m, g) for n, d, m, g in _THEMES],
-                                spacing="2",
+                            _section_header("Settings"),
+                            _pref_row(
+                                "Profile Visibility",
+                                rx.switch(
+                                    checked=True, # Placeholder
+                                    checked_track_color="black",
+                                ),
+                                sublabel="Show your profile in search",
                             ),
-                            spacing="2", align="start", width="100%",
-                            padding="10px 0",
-                            border_bottom="1px solid rgba(124,58,237,0.08)",
-                        ),
-                        rx.vstack(
-                            rx.text("Accent Color", size="2", color="#c4b5fd"),
-                            rx.hstack(
-                                *[_accent_swatch(n, m, l) for n, m, l in _ACCENTS],
-                                spacing="3",
+                            _pref_row(
+                                "Stats Bar",
+                                rx.switch(
+                                    checked=UploadState.show_stats_bar,
+                                    on_change=UploadState.toggle_stats_bar,
+                                    checked_track_color="black",
+                                ),
+                                sublabel="Show storage & image stats",
                             ),
-                            spacing="2", align="start", width="100%",
-                            padding="10px 0",
-                        ),
-                        spacing="2", align="start", width="100%",
-                    ),
 
-                    rx.divider(color="rgba(124,58,237,0.12)"),
+                            rx.divider(color="#f1f1f1", margin="8px 0"),
 
-                    # ――― Gallery Section ―――
-                    rx.vstack(
-                        rx.text("GALLERY", size="1", weight="bold", color="#4b5563", letter_spacing="1.5px"),
-                        _pref_row(
-                            "Stats Bar",
-                            rx.switch(
-                                checked=UploadState.show_stats_bar,
-                                on_change=UploadState.toggle_stats_bar,
-                                color_scheme="purple",
-                            ),
-                        ),
-                        _pref_row(
-                            "Default Sort",
-                            rx.select(
-                                ["Newest first", "Oldest first", "A → Z", "Z → A", "Largest first"],
-                                value=UploadState.sort_by,
-                                on_change=UploadState.set_sort_by,
-                                size="1",
-                                background="rgba(255,255,255,0.06)",
-                                border="1px solid rgba(124,58,237,0.3)",
-                                color="white",
-                                border_radius="8px",
-                                width="140px",
-                            ),
-                        ),
-                        _pref_row(
-                            "Card Size",
-                            rx.hstack(
-                                rx.button(
-                                    "S",
-                                    on_click=UploadState.set_card_size("small"),
-                                    size="1",
-                                    variant=rx.cond(UploadState.card_size == "small", "solid", "ghost"),
-                                    color_scheme="purple",
-                                ),
-                                rx.button(
-                                    "M",
-                                    on_click=UploadState.set_card_size("medium"),
-                                    size="1",
-                                    variant=rx.cond(UploadState.card_size == "medium", "solid", "ghost"),
-                                    color_scheme="purple",
-                                ),
-                                rx.button(
-                                    "L",
-                                    on_click=UploadState.set_card_size("large"),
-                                    size="1",
-                                    variant=rx.cond(UploadState.card_size == "large", "solid", "ghost"),
-                                    color_scheme="purple",
-                                ),
-                                spacing="1",
-                            ),
-                        ),
-                        _pref_row(
-                            "Default View",
-                            rx.hstack(
-                                rx.button(
-                                    rx.icon("layout-grid", size=14),
-                                    on_click=UploadState.set_view_mode("grid"),
-                                    size="1",
-                                    variant=rx.cond(UploadState.view_mode == "grid", "solid", "ghost"),
-                                    color_scheme="purple",
-                                    title="Grid view",
-                                ),
-                                rx.button(
-                                    rx.icon("list", size=14),
-                                    on_click=UploadState.set_view_mode("list"),
-                                    size="1",
-                                    variant=rx.cond(UploadState.view_mode == "list", "solid", "ghost"),
-                                    color_scheme="purple",
-                                    title="List view",
-                                ),
-                                spacing="1",
-                            ),
-                        ),
-                        spacing="1", align="start", width="100%",
-                    ),
-
-                    rx.divider(color="rgba(124,58,237,0.12)"),
-
-                    # ――― About Section ―――
-                    rx.vstack(
-                        rx.text("ABOUT", size="1", weight="bold", color="#4b5563", letter_spacing="1.5px"),
-                        rx.hstack(
-                            rx.image(
-                                src="/turkey_icon.png",
-                                width="32px", height="32px",
-                                border_radius="8px",
-                                object_fit="cover",
-                            ),
+                            _section_header("Appearance"),
                             rx.vstack(
+                                rx.text("Accent Color", size="2", color="#111827", weight="medium", padding_left="16px"),
                                 rx.hstack(
-                                    rx.text("turkey", size="3", weight="bold", color="white"),
-                                    rx.text(".app", size="3", weight="bold", color="#a855f7"),
-                                    spacing="0",
+                                    *[_accent_swatch(n, m, l) for n, m, l in _ACCENTS],
+                                    spacing="3",
+                                    padding="8px 16px",
                                 ),
-                                rx.text("v0.1 · Media Library", size="1", color="#4b5563"),
-                                spacing="0", align="start",
+                                spacing="2", align="start", width="100%",
                             ),
-                            spacing="3", align="center",
+
+                            rx.divider(color="#f1f1f1", margin="8px 0"),
+
+                            _section_header("Gallery Layout"),
+                            _pref_row(
+                                "Card Size",
+                                rx.select(
+                                    ["Small", "Medium", "Large"],
+                                    value=UploadState.card_size.capitalize(),
+                                    on_change=lambda v: UploadState.set_card_size(v.lower()),
+                                    size="1",
+                                    variant="soft",
+                                    color_scheme="gray",
+                                ),
+                            ),
+                            _pref_row(
+                                "Sort By",
+                                rx.select(
+                                    ["Newest first", "Oldest first", "A → Z", "Z → A", "Largest first"],
+                                    value=UploadState.sort_by,
+                                    on_change=UploadState.set_sort_by,
+                                    size="1",
+                                    variant="soft",
+                                    color_scheme="gray",
+                                ),
+                            ),
+
+                            rx.divider(color="#f1f1f1", margin="8px 0"),
+
+                            _section_header("Support"),
+                            rx.hstack(
+                                rx.text("Help Center", size="2", color="#111827", weight="medium"),
+                                rx.spacer(),
+                                rx.icon("external-link", size=14, color="#6b7280"),
+                                padding="12px 16px",
+                                border_radius="10px",
+                                width="100%",
+                                cursor="pointer",
+                                _hover={"background": "#f1f1f1"},
+                            ),
+                            rx.hstack(
+                                rx.text("Privacy Policy", size="2", color="#111827", weight="medium"),
+                                rx.spacer(),
+                                rx.icon("external-link", size=14, color="#6b7280"),
+                                padding="12px 16px",
+                                border_radius="10px",
+                                width="100%",
+                                cursor="pointer",
+                                _hover={"background": "#f1f1f1"},
+                            ),
+
+                            rx.divider(color="#f1f1f1", margin="8px 0"),
+
+                            _section_header("Export & Backup"),
+                            rx.hstack(
+                                rx.vstack(
+                                    rx.text("Digital Portfolio", size="2", color="#111827", weight="medium"),
+                                    rx.text("Self-contained HTML gallery", size="1", color="#6b7280"),
+                                    spacing="0", align="start",
+                                ),
+                                rx.spacer(),
+                                rx.button(
+                                    rx.icon("download", size=14),
+                                    "Export",
+                                    on_click=UploadState.export_portfolio,
+                                    size="2", variant="surface", color_scheme="purple",
+                                    cursor="pointer",
+                                ),
+                                padding="12px 16px",
+                                width="100%",
+                            ),
+                            rx.cond(
+                                UploadState.export_status != "",
+                                rx.box(
+                                    rx.text(UploadState.export_status, size="1", color="#7c3aed", padding_left="16px"),
+                                    padding_bottom="8px",
+                                ),
+                            ),
+
+                            rx.divider(color="#f1f1f1", margin="8px 0"),
+
+                            _section_header("Resources"),
+                            rx.hstack(
+                                rx.text("About", size="1", color="#6b7280", weight="bold", cursor="pointer", _hover={"text_decoration": "underline"}),
+                                rx.text("Blog", size="1", color="#6b7280", weight="bold", cursor="pointer", _hover={"text_decoration": "underline"}),
+                                rx.text("Careers", size="1", color="#6b7280", weight="bold", cursor="pointer", _hover={"text_decoration": "underline"}),
+                                spacing="4",
+                                padding="8px 16px",
+                            ),
+
+                            spacing="0",
+                            width="100%",
+                            padding_bottom="40px",
                         ),
-                        rx.text(
-                            "Built with Reflex · SQLite · Google OAuth",
-                            size="1", color="#374151",
-                        ),
-                        spacing="3", align="start", width="100%",
-                        padding_top="4px",
+                        width="100%",
+                        overflow_y="auto",
                     ),
 
                     spacing="5",
                     align="start",
                     width="100%",
+                    padding_bottom="40px",
                 ),
                 # Panel styles
-                padding="24px",
-                background="rgba(8,4,22,0.98)",
-                border_left="1px solid rgba(124,58,237,0.25)",
-                width="340px",
+                background="#ffffff",
+                border_left="1px solid #f1f1f1",
+                width="380px",
                 height="100vh",
                 position="fixed",
                 top="0",
                 right="0",
-                overflow_y="auto",
-                z_index="200",
-                box_shadow="-12px 0 50px rgba(0,0,0,0.6)",
-                backdrop_filter="blur(20px)",
+                z_index="1500",
+                box_shadow="-10px 0 30px rgba(0,0,0,0.05)",
+                transition="all 0.3s ease-in-out",
             ),
         ),
         rx.box(),
@@ -1259,8 +1399,8 @@ def stats_bar() -> rx.Component:
         return rx.box(
             rx.vstack(
                 rx.hstack(
-                    rx.icon(icon, size=18, color="#a78bfa"),
-                    rx.text(value, size="5", weight="bold", color="white"),
+                    rx.icon(icon, size=18, color=UploadState.accent_hex),
+                    rx.text(value, size="5", weight="bold", color="#111827"),
                     spacing="2",
                     align="center",
                 ),
@@ -1269,8 +1409,8 @@ def stats_bar() -> rx.Component:
                 align="start",
             ),
             padding="16px 20px",
-            background="rgba(255,255,255,0.03)",
-            border="1px solid rgba(124,58,237,0.15)",
+            background="#ffffff",
+            border="1px solid #f1f1f1",
             border_radius="14px",
             flex="1",
             min_width="110px",
@@ -1293,23 +1433,23 @@ def rename_folder_modal() -> rx.Component:
             rx.box(
                 rx.vstack(
                     rx.hstack(
-                        rx.icon("pencil", size=22, color="#a78bfa"),
-                        rx.heading("Rename Folder", size="5", color="white"),
+                        rx.icon("pencil", size=22, color=UploadState.accent_hex),
+                        rx.heading("Rename Folder", size="5", color="#111827"),
                         spacing="3",
                         align="center",
                     ),
                     rx.text(
                         'Renaming: "', UploadState.renaming_folder, '"',
-                        size="2", color="#c4b5fd",
+                        size="2", color="#6b7280",
                     ),
                     rx.input(
                         value=UploadState.rename_folder_input,
                         on_change=UploadState.set_rename_folder_input,
                         size="3",
-                        background="rgba(255,255,255,0.08)",
-                        border="1px solid rgba(124,58,237,0.5)",
+                        background="#ffffff",
+                        border="1px solid #e2e2e2",
                         border_radius="10px",
-                        color="white",
+                        color="#111827",
                         width="100%",
                         auto_focus=True,
                     ),
@@ -1326,7 +1466,10 @@ def rename_folder_modal() -> rx.Component:
                             "Rename",
                             on_click=UploadState.confirm_rename_folder,
                             size="3",
-                            background="linear-gradient(135deg, #7c3aed, #a855f7)",
+                            background=rx.color_mode_cond(
+                                light=f"linear-gradient(135deg, {UploadState.accent_hex}, {UploadState.accent_light})",
+                                dark=f"linear-gradient(135deg, {UploadState.accent_hex}, {UploadState.accent_light})",
+                            ),
                             color="white",
                             border_radius="10px",
                             cursor="pointer",
@@ -1339,17 +1482,17 @@ def rename_folder_modal() -> rx.Component:
                     width="100%",
                 ),
                 padding="32px",
-                background="rgba(15,10,40,0.98)",
-                border="1px solid rgba(124,58,237,0.4)",
+                background="#ffffff",
+                border="1px solid #e5e7eb",
                 border_radius="20px",
                 width="400px",
-                box_shadow="0 25px 60px rgba(0,0,0,0.7)",
+                box_shadow="0 25px 60px rgba(0,0,0,0.1)",
             ),
             position="fixed",
             top="0", left="0",
             width="100vw", height="100vh",
-            background="rgba(0,0,0,0.6)",
-            backdrop_filter="blur(6px)",
+            background="rgba(0,0,0,0.1)",
+            backdrop_filter="blur(4px)",
             display="flex",
             align_items="center",
             justify_content="center",
@@ -1365,8 +1508,8 @@ def bulk_action_bar() -> rx.Component:
         rx.box(
             rx.hstack(
                 rx.hstack(
-                    rx.icon("square-check", size=18, color="#a855f7"),
-                    rx.text(UploadState.bulk_count, " selected", size="2", weight="medium", color="white"),
+                    rx.icon("square-check", size=18, color=UploadState.accent_hex),
+                    rx.text(UploadState.bulk_count, " selected", size="2", weight="medium", color="#111827"),
                     spacing="2",
                     align="center",
                 ),
@@ -1378,18 +1521,18 @@ def bulk_action_bar() -> rx.Component:
                         placeholder="Move selected to…",
                         on_change=UploadState.bulk_move,
                         size="2",
-                        background="rgba(255,255,255,0.08)",
-                        border="1px solid rgba(124,58,237,0.4)",
+                        background="#ffffff",
+                        border="1px solid #e5e7eb",
                         border_radius="8px",
-                        color="white",
+                        color="#111827",
                     ),
                     rx.button(
                         rx.icon("trash-2", size=14),
                         "Delete Selected",
                         on_click=UploadState.bulk_delete,
                         size="2",
-                        background="rgba(239,68,68,0.12)",
-                        border="1px solid rgba(239,68,68,0.35)",
+                        background="rgba(239,68,68,0.08)",
+                        border="1px solid rgba(239,68,68,0.2)",
                         border_radius="8px",
                         color="#ef4444",
                         cursor="pointer",
@@ -1406,8 +1549,8 @@ def bulk_action_bar() -> rx.Component:
                 gap="3",
             ),
             padding="14px 20px",
-            background="rgba(124,58,237,0.12)",
-            border="1px solid rgba(124,58,237,0.35)",
+            background="#f9fafb",
+            border="1px solid #f1f1f1",
             border_radius="14px",
             width="100%",
         ),
@@ -1438,8 +1581,8 @@ def import_export_page() -> rx.Component:
                         box_shadow="0 4px 20px rgba(124,58,237,0.4)",
                     ),
                     rx.vstack(
-                        rx.heading("Media Library", size="6", color="white"),
-                        rx.text("Import · Manage · Export", size="2", color="#a78bfa"),
+                        rx.heading("Media Library", size="6", color="#111827"),
+                        rx.text("Import · Manage · Export", size="2", color="#6b7280"),
                         spacing="0",
                         align="start",
                     ),
@@ -1454,7 +1597,7 @@ def import_export_page() -> rx.Component:
                 gap="4",
             ),
 
-            rx.divider(color="rgba(124,58,237,0.2)"),
+            rx.divider(color="#f1f1f1"),
 
             # ── Live stats (hideable) ──
             rx.cond(UploadState.show_stats_bar, stats_bar(), rx.box()),
@@ -1465,8 +1608,8 @@ def import_export_page() -> rx.Component:
                 rx.box(
                     rx.vstack(
                         rx.hstack(
-                            rx.icon("upload", size=18, color="#a78bfa"),
-                            rx.text("Import Images", size="3", weight="bold", color="white"),
+                            rx.icon("upload", size=18, color="#7c3aed"),
+                            rx.text("Import Images", size="3", weight="bold", color="#111827"),
                             spacing="2",
                             align="center",
                         ),
@@ -1475,8 +1618,8 @@ def import_export_page() -> rx.Component:
                         width="100%",
                     ),
                     padding="24px",
-                    background="rgba(255,255,255,0.03)",
-                    border="1px solid rgba(124,58,237,0.2)",
+                    background="#f9fafb",
+                    border="1px solid #f1f1f1",
                     border_radius="20px",
                     flex="1",
                     min_width="320px",
@@ -1486,8 +1629,8 @@ def import_export_page() -> rx.Component:
                 rx.box(
                     rx.vstack(
                         rx.hstack(
-                            rx.icon("folder-plus", size=18, color="#a78bfa"),
-                            rx.text("Folders", size="3", weight="bold", color="white"),
+                            rx.icon("folder-plus", size=18, color="#7c3aed"),
+                            rx.text("Folders", size="3", weight="bold", color="#111827"),
                             spacing="2",
                             align="center",
                         ),
@@ -1497,10 +1640,10 @@ def import_export_page() -> rx.Component:
                                 value=UploadState.new_folder_name,
                                 on_change=UploadState.set_new_folder_name,
                                 size="2",
-                                background="rgba(255,255,255,0.06)",
-                                border="1px solid rgba(124,58,237,0.3)",
+                                background="#ffffff",
+                                border="1px solid #e2e2e2",
                                 border_radius="10px",
-                                color="white",
+                                color="#111827",
                                 flex="1",
                             ),
                             rx.button(
@@ -1731,7 +1874,7 @@ def import_export_page() -> rx.Component:
             padding="32px 24px",
         ),
         min_height="100vh",
-        background="radial-gradient(ellipse at top, #130a2e 0%, #0a0515 60%, #050208 100%)",
+        background="#ffffff",
         display="flex",
         justify_content="center",
         on_mount=UploadState.on_load,

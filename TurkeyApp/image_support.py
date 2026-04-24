@@ -35,6 +35,12 @@ def encode_image(img_path: Path) -> tuple:
     return data_uri, mime_type
 
 
+def get_image_data_uri(img_path: str) -> str:
+    """Convenience wrapper to get just the data URI for a filename/path."""
+    uri, _ = encode_image(Path(img_path))
+    return uri
+
+
 def collect_images(folder: Path) -> list:
     """Go through a folder and return a list of encoded image dicts."""
     images = []

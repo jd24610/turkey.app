@@ -1,4 +1,5 @@
 """State management for Import/Export functionality."""
+from typing import Optional
 
 import reflex as rx
 import datetime
@@ -8,14 +9,15 @@ import io
 import base64
 from pydantic import BaseModel
 from TurkeyApp.models import ImageRecord, Folder, Tag, ImageTag
+from TurkeyApp.portfolio_utils import generate_portfolio_html
+from TurkeyApp.image_support import get_image_data_uri
 
 # Constants
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024        # 10 MB hard limit
 COMPRESS_THRESHOLD_BYTES = 10 * 1024 * 1024   # start compressing at 10 MB
 COMPRESS_MAX_BYTES = 20 * 1024 * 1024         # up to 20 MB gets auto-compressed
 STORAGE_QUOTA_BYTES = 1 * 1024 * 1024 * 1024  # 1 GB quota
-UPLOAD_DIR = "uploaded_files"
-
+UPLOAD_DIR = os.path.join("assets", "uploaded_files")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -40,10 +42,10 @@ class ImageData(BaseModel):
     size_kb: float = 0.0
     is_large: bool = False       # size_bytes > 1MB
     was_compressed: bool = False
-    created_at: str = ""
+    created_at: Optional[str] = ""
     tag_ids: list[int] = []
     is_public: bool = False      # shared on public profile & feed
-    caption: str = ""            # optional public caption
+    caption: Optional[str] = ""  # optional public caption
 
 
 class UploadState(rx.State):
@@ -62,6 +64,7 @@ class UploadState(rx.State):
     # ---- Data ----
     images: list[ImageData] = []
     folders: list[str] = []
+    public_folders: list[str] = []  # names of folders that are public
     selected_folder: str = ""
     new_folder_name: str = ""
     folder_filter: str = ""
@@ -103,13 +106,17 @@ class UploadState(rx.State):
     selected_image_ids: list[int] = []
     selection_mode: bool = False
 
-    # ---- User preferences ----
+    # ---- User preferences (cookie-persisted) ----
     settings_open: bool = False
-    bg_theme: str = "#080514"        # background color
-    accent_hex: str = "#7c3aed"      # primary accent color
-    accent_light: str = "#a855f7"    # lighter accent (for text highlights)
-    card_size: str = "medium"        # "small" | "medium" | "large"
-    show_stats_bar: bool = True      # toggle the live stats row
+    bg_theme: str = rx.Cookie(
+        "#ffffff",
+        name="pref_bg_theme",
+        max_age=31536000,
+    )
+    accent_hex: str = rx.Cookie("#7c3aed", name="pref_accent_hex", max_age=31536000)
+    accent_light: str = rx.Cookie("#a855f7", name="pref_accent_light", max_age=31536000)
+    card_size: str = rx.Cookie("medium", name="pref_card_size", max_age=31536000)
+    show_stats_bar: bool = True
 
 
     # ── Computed ──────────────────────────────
@@ -291,6 +298,26 @@ class UploadState(rx.State):
     def set_user_name(self, name: str):
         self.user_name = name
 
+    # ── Preferences ───────────────────────────
+    def toggle_settings(self):
+        self.settings_open = not self.settings_open
+
+    def close_settings(self):
+        self.settings_open = False
+
+    def set_accent(self, main: str, light: str):
+        self.accent_hex = main
+        self.accent_light = light
+
+    def toggle_stats_bar(self, checked: bool):
+        self.show_stats_bar = checked
+
+    def set_card_size(self, size: str):
+        self.card_size = size
+
+    def set_view_mode(self, mode: str):
+        self.view_mode = mode
+
     def set_selected_folder(self, folder: str):
         self.selected_folder = folder
 
@@ -419,6 +446,27 @@ class UploadState(rx.State):
         self.upload_message = (
             f'📁 Moved to "{actual}"!' if actual else "📁 Removed from folder."
         )
+        self.toast_visible = True
+
+    # ── Toggle public/private per image ───────
+
+    def toggle_image_public(self, image_id: int):
+        """Flip the is_public flag on a single image."""
+        new_state = False
+        with rx.session() as session:
+            record = session.get(ImageRecord, image_id)
+            if record and record.owner_email == self._owner_email():
+                record.is_public = not record.is_public
+                new_state = record.is_public
+                session.add(record)
+                session.commit()
+        self._refresh_images()
+        if new_state:
+            self.upload_status = "success"
+            self.upload_message = "🌐 Image is now public."
+        else:
+            self.upload_status = "warning"
+            self.upload_message = "🔒 Image set to private."
         self.toast_visible = True
 
     # ── Rename folder ─────────────────────────
@@ -630,6 +678,29 @@ class UploadState(rx.State):
                 )
             ).all()
             self.folders = [r.name for r in records]
+            self.public_folders = [r.name for r in records if r.is_public]
+
+    def toggle_folder_public(self, folder_name: str):
+        """Toggle whether a folder (and its content) is public."""
+        with rx.session() as session:
+            record = session.exec(
+                Folder.select().where(
+                    Folder.owner_email == self._owner_email(),
+                    Folder.name == folder_name
+                )
+            ).first()
+            if record:
+                record.is_public = not record.is_public
+                session.add(record)
+                
+                # Option: Also toggle all images in this folder?
+                # For now, just the folder metadata.
+                session.commit()
+        self._refresh_folders()
+        status = "public" if folder_name in self.public_folders else "private"
+        self.upload_status = "success"
+        self.upload_message = f'📁 Folder "{folder_name}" is now {status}.'
+        self.toast_visible = True
 
     def _refresh_tags(self):
         with rx.session() as session:
@@ -834,8 +905,8 @@ class UploadState(rx.State):
             ext = os.path.splitext(name)[1].lower()
 
             # 1. Type check
-            if ext not in (".jpg", ".jpeg", ".png"):
-                errors.append(f"{name}: Only JPG and PNG are allowed.")
+            if ext not in (".jpg", ".jpeg", ".png", ".webp"):
+                errors.append(f"{name}: Only JPG, PNG and WEBP are allowed.")
                 continue
 
             # 2. Size hard reject (>20 MB)
@@ -986,3 +1057,37 @@ class UploadState(rx.State):
             )
         except Exception as e:
             self.export_status = f'❌ Export failed: {e}'
+
+    def export_portfolio(self):
+        """Generate a self-contained HTML portfolio of the current view."""
+        current_images = self.images
+        if not current_images:
+            self.upload_status = "error"
+            self.upload_message = "No images to export in this view."
+            self.toast_visible = True
+            return
+
+        self.upload_status = "success"
+        self.upload_message = "Generating your digital portfolio..."
+        self.toast_visible = True
+
+        export_data = []
+        for img in current_images:
+            # Read image and convert to data URI
+            full_path = os.path.join(UPLOAD_DIR, img.filename)
+            if os.path.exists(full_path):
+                data_uri = get_image_data_uri(full_path)
+                export_data.append({
+                    "name": img.original_filename,
+                    "stem": os.path.splitext(img.original_filename)[0],
+                    "size_kb": f"{img.size_kb:.1f}",
+                    "data_uri": data_uri
+                })
+
+        title = self.selected_folder if self.selected_folder else "All Media"
+        html_content = generate_portfolio_html(export_data, title)
+        
+        return rx.download(
+            data=html_content,
+            filename=f"portfolio_{title.lower().replace(' ', '_')}.html"
+        )

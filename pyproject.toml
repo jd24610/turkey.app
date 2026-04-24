@@ -3,8 +3,9 @@ name = "turkey-app"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.14"
+requires-python = ">=3.12"
 dependencies = [
     "pillow>=12.1.1",
     "reflex>=0.8.26",
+    "sqlmodel>=0.0.22",
 ]
