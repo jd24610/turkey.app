@@ -9,6 +9,7 @@ dependencies = [
     "reflex>=0.8.26",
     "sqlmodel>=0.0.22",
     "requests",
-    "pinecone-client",
+    "pinecone",
     "python-dotenv",
+    "reflex-hosting-cli==0.1.63",
 ]
