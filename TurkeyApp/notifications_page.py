@@ -44,7 +44,7 @@ def notification_row(notif: rx.Base) -> rx.Component:
             ),
             spacing="4", align="center", width="100%", padding="16px",
         ),
-        background="white",
+        background=UploadState.bg_card,
         border="1px solid " + UploadState.border_color,
         border_radius="12px",
         margin_bottom="12px",

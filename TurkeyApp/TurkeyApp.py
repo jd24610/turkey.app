@@ -127,10 +127,9 @@ def login_page() -> rx.Component:
                                     border_radius="12px",
                                     cursor="pointer",
                                     border="1px solid " + UploadState.border_color,
-                                    color="#4b5563",
+                                    color=UploadState.sub_text_color,
                                     _hover={
-                                        "background": "#f9fafb",
-                                        "border_color": "#d1d5db",
+                                        "background": "rgba(0,0,0,0.04)",
                                     },
                                     transition="all 0.2s ease",
                                 ),

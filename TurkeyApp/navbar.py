@@ -18,10 +18,7 @@ def _nav_link(label: str, icon: str, route: str, is_active: bool = False) -> rx.
             border_radius="99px",
             background=rx.cond(is_active, UploadState.text_color, "transparent"),
             color=rx.cond(is_active, UploadState.nav_bg, UploadState.text_color),
-            _hover={
-                "background": "rgba(0,0,0,0.05)",
-                "color": UploadState.text_color,
-            } if not is_active else {},
+            _hover={"opacity": "0.75"},
             transition="all 0.2s ease",
         ),
         href=route,

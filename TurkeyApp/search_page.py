@@ -117,9 +117,9 @@ def search_result_card(result: rx.Base) -> rx.Component:
         border_radius="16px",
         _hover={
             "border_color": "rgba(168,85,247,0.45)",
-            "background": "rgba(124,58,237,0.07)",
+            "background": "rgba(124,58,237,0.04)",
             "transform": "translateY(-2px)",
-            "box_shadow": "0 8px 28px rgba(0,0,0,0.3)",
+            "box_shadow": "0 8px 20px rgba(0,0,0,0.08)",
         },
         transition="all 0.2s ease",
         width="100%",
@@ -237,7 +237,7 @@ def search_page() -> rx.Component:
                         rx.input(
                             value=ProfileState.search_query,
                             on_change=ProfileState.set_search_query,
-                            on_key_up=lambda key: rx.cond(
+                            on_key_down=lambda key: rx.cond(
                                 key == "Enter",
                                 ProfileState.run_search,
                                 rx.noop(),
