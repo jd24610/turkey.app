@@ -1,5 +1,4 @@
 services:
-  # ─── Service 1: The App Backend (Reflex) ───
   - type: web
     name: turkey-app-backend
     runtime: docker
@@ -9,22 +8,5 @@ services:
     envVars:
       - key: PORT
         value: 8000
-      - key: BRAIN_URL
-        fromService:
-          type: web
-          name: turkey-app-brain
-          property: host
-      # This will prompt you to enter the URL of this service once created
       - key: API_URL
         sync: false
-
-  # ─── Service 2: The AI Brain (FastAPI) ───
-  - type: web
-    name: turkey-app-brain
-    runtime: docker
-    dockerContext: .
-    dockerfilePath: Dockerfile.brain
-    plan: free
-    envVars:
-      - key: PORT
-        value: 8001
