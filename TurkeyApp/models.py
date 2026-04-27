@@ -44,6 +44,7 @@ class ImageRecord(rx.Model, table=True):
     created_at: Optional[str] = Field(default=None)
     is_public: bool = Field(default=False)
     caption: Optional[str] = Field(default=None)
+    exif_info: Optional[str] = Field(default=None) # JSON-stringified metadata
 
 
 class Tag(rx.Model, table=True):

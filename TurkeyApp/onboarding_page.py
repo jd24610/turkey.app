@@ -2,6 +2,7 @@
 
 import reflex as rx
 from TurkeyApp.profile_state import ProfileState
+from TurkeyApp.upload_state import UploadState
 
 
 # ─── Step indicator ────────────────────────────────────────────────────────────
@@ -81,10 +82,10 @@ def step_one() -> rx.Component:
                     placeholder="your_handle",
                     size="3",
                     flex="1",
-                    background="#ffffff",
+                    background=UploadState.bg_theme,
                     border="1px solid #e2e2e2",
                     border_radius="12px",
-                    color="#111827",
+                    color=UploadState.text_color,
                     _placeholder={"color": "#9ca3af"},
                     _focus={"border_color": "#7c3aed", "box_shadow": "0 0 0 3px rgba(124,58,237,0.1)"},
                 ),
@@ -101,7 +102,7 @@ def step_one() -> rx.Component:
                 ),
                 rx.text(
                     "3–20 chars · lowercase, numbers, underscores",
-                    size="1", color="#6b7280",
+                    size="1", color=UploadState.sub_text_color,
                 ),
             ),
             spacing="2", width="100%", align="start",
@@ -115,16 +116,16 @@ def step_one() -> rx.Component:
                 placeholder="Your full name or nickname",
                 size="3",
                 width="100%",
-                background="#ffffff",
+                background=UploadState.bg_theme,
                 border="1px solid #e2e2e2",
                 border_radius="12px",
-                color="#111827",
+                color=UploadState.text_color,
                 _placeholder={"color": "#9ca3af"},
                 _focus={"border_color": "#7c3aed", "box_shadow": "0 0 0 3px rgba(124,58,237,0.1)"},
             ),
             rx.text(
                 "This is how your name appears on your profile",
-                size="1", color="#6b7280",
+                size="1", color=UploadState.sub_text_color,
             ),
             spacing="2", width="100%", align="start",
         ),
@@ -143,7 +144,7 @@ def step_two() -> rx.Component:
         "background": "#ffffff",
         "border": "1px solid #e2e2e2",
         "border_radius": "12px",
-        "color": "#111827",
+        "color": UploadState.text_color,
         "_placeholder": {"color": "#9ca3af"},
         "_focus": {"border_color": "#7c3aed", "box_shadow": "0 0 0 3px rgba(124,58,237,0.1)"},
     }
@@ -194,7 +195,7 @@ def step_two() -> rx.Component:
         rx.vstack(
             field_label("Website"),
             rx.hstack(
-                rx.icon("globe", size=16, color="#6b7280", flex_shrink="0"),
+                rx.icon("globe", size=16, color=UploadState.sub_text_color, flex_shrink="0"),
                 rx.input(
                     value=ProfileState.website_input,
                     on_change=ProfileState.set_website_input,
@@ -239,7 +240,7 @@ def step_media() -> rx.Component:
                     padding="0",
                     border_radius="50%",
                 ),
-                rx.text("Click to Change", size="1", color="#6b7280"),
+                rx.text("Click to Change", size="1", color=UploadState.sub_text_color),
                 spacing="2", align="center",
             ),
             rx.vstack(
@@ -264,7 +265,7 @@ def step_media() -> rx.Component:
                     padding="0",
                     border_radius="12px",
                 ),
-                rx.text("Ideal: 1200x400", size="1", color="#6b7280"),
+                rx.text("Ideal: 1200x400", size="1", color=UploadState.sub_text_color),
                 spacing="2", align="center",
             ),
             spacing="6", align="center", width="100%",
@@ -314,7 +315,7 @@ def step_three() -> rx.Component:
                     ),
                     rx.vstack(
                         rx.hstack(
-                            rx.text(ProfileState.display_name_input, size="4", weight="bold", color="#111827"),
+                            rx.text(ProfileState.display_name_input, size="4", weight="bold", color=UploadState.text_color),
                             spacing="0",
                         ),
                         rx.text("@", ProfileState.username_input, size="2", color="#7c3aed"),
@@ -332,7 +333,7 @@ def step_three() -> rx.Component:
             ),
             padding="20px 24px",
             background="#f9fafb",
-            border="1px solid #f1f1f1",
+            border="1px solid " + UploadState.border_color,
             border_radius="16px",
             width="100%",
         ),
@@ -343,12 +344,12 @@ def step_three() -> rx.Component:
                 rx.vstack(
                     rx.hstack(
                         rx.icon("globe", size=16, color="#7c3aed"),
-                        rx.text("Public Library", size="3", weight="medium", color="#111827"),
+                        rx.text("Public Library", size="3", weight="medium", color=UploadState.text_color),
                         spacing="2", align="center",
                     ),
                     rx.text(
                         "Anyone can view your profile and images at turkey.app/@you",
-                        size="2", color="#6b7280",
+                        size="2", color=UploadState.sub_text_color,
                     ),
                     spacing="1", align="start",
                 ),
@@ -362,8 +363,8 @@ def step_three() -> rx.Component:
                 width="100%",
             ),
             padding="16px 20px",
-            background="#ffffff",
-            border="1px solid #f1f1f1",
+            background=UploadState.bg_theme,
+            border="1px solid " + UploadState.border_color,
             border_radius="14px",
             width="100%",
         ),
@@ -414,11 +415,11 @@ def onboarding_modal() -> rx.Component:
                         ),
                         rx.heading(
                             ProfileState.step_title,
-                            size="6", color="#111827", text_align="center",
+                            size="6", color=UploadState.text_color, text_align="center",
                         ),
                         rx.text(
                             ProfileState.step_subtitle,
-                            size="2", color="#6b7280", text_align="center",
+                            size="2", color=UploadState.sub_text_color, text_align="center",
                             max_width="340px",
                         ),
                         step_indicator(),
@@ -497,7 +498,7 @@ def onboarding_modal() -> rx.Component:
                     width="100%",
                 ),
                 padding="40px",
-                background="#ffffff",
+                background=UploadState.bg_theme,
                 border="1px solid #e5e7eb",
                 border_radius="28px",
                 box_shadow="0 40px 80px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.02)",

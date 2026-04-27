@@ -6,6 +6,7 @@ from datetime import datetime
 from pydantic import BaseModel
 from TurkeyApp.models import ImageRecord, UserProfile, Follow, Like
 from TurkeyApp.profile_state import ProfileState
+from TurkeyApp.upload_state import UploadState
 from TurkeyApp.navbar import navbar
 
 
@@ -36,6 +37,86 @@ class FeedState(rx.State):
     active_tab: str = "all"   # "all" | "following"
     tag_filter: str = ""     # tag name to filter by
     trending_tags: list[dict] = []
+
+    search_query: str = ""
+    is_semantic_search: bool = False
+
+    # ── semantic search ────────────────────────────────────────────────────────
+    
+    def set_search_query(self, q: str):
+        self.search_query = q
+
+    async def run_semantic_search(self):
+        """Uses the AI Brain to filter the feed by meaning."""
+        q = self.search_query.strip()
+        if not q:
+            self.is_semantic_search = False
+            return await self.load_posts()
+            
+        self.loading = True
+        try:
+            from TurkeyApp.ai_utils import get_text_embeddings, query_pinecone
+            # 1. Vectorize query
+            vector = await get_text_embeddings(q)
+            if not vector:
+                self.is_semantic_search = False
+                return await self.load_posts()
+                
+            # 2. Query Pinecone
+            match_ids = await query_pinecone(vector, top_k=24)
+            if not match_ids:
+                self.posts = []
+                self.is_semantic_search = True
+                return
+
+            # 3. Fetch from SQL
+            with rx.session() as session:
+                int_ids = []
+                for mid in match_ids:
+                    try: int_ids.append(int(mid))
+                    except: pass
+                
+                if not int_ids:
+                    self.posts = []
+                    self.is_semantic_search = True
+                    return
+
+                images = session.exec(
+                    sqlmodel.select(ImageRecord, UserProfile)
+                    .join(UserProfile, ImageRecord.owner_email == UserProfile.email)
+                    .where(ImageRecord.id.in_(int_ids))
+                    .where(ImageRecord.is_public == True)
+                ).all()
+                
+                profile_map = {p.email: p for img, p in images}
+                img_records = [img for img, p in images]
+                
+                viewer_email = await self._viewer_email()
+                posts_unsorted = self._build_posts(img_records, profile_map, viewer_email, session)
+                
+                # Restore Pinecone relevance order
+                id_to_post = {p.image_id: p for p in posts_unsorted}
+                sorted_posts = []
+                for mid in match_ids:
+                    try:
+                        mid_int = int(mid)
+                        if mid_int in id_to_post:
+                            sorted_posts.append(id_to_post[mid_int])
+                    except: pass
+                
+                self.posts = sorted_posts
+                self.is_semantic_search = True
+        except Exception as e:
+            print(f"Feed Semantic Search Error: {e}")
+            self.is_semantic_search = False
+            await self.load_posts()
+        finally:
+            self.loading = False
+
+    def clear_search(self):
+        self.search_query = ""
+        self.is_semantic_search = False
+        return self.load_posts()
 
     # ── helpers ───────────────────────────────────────────────────────────────
 
@@ -106,7 +187,7 @@ class FeedState(rx.State):
 
     # ── loaders ───────────────────────────────────────────────────────────────
 
-    async def load_feed(self):
+    async def load_posts(self):
         """Fetch the most recent public images (respects active tab)."""
         self.loading = True
         try:
@@ -169,19 +250,19 @@ class FeedState(rx.State):
         self.tag_filter = ""
         self.loaded = False
         self.posts = []
-        return FeedState.load_feed
+        return FeedState.load_posts
 
     def set_tag_filter(self, tag_name: str):
         self.tag_filter = tag_name
         self.loaded = False
         self.posts = []
-        return FeedState.load_feed
+        return FeedState.load_posts
 
     def clear_tag_filter(self):
         self.tag_filter = ""
         self.loaded = False
         self.posts = []
-        return FeedState.load_feed
+        return FeedState.load_posts
 
     def load_trending_tags(self):
         """Fetch top 8 most used tags for sidebar."""
@@ -263,7 +344,7 @@ def _feed_avatar(post: rx.Base) -> rx.Component:
     return rx.cond(
         post.owner_avatar_url != "",
         rx.image(
-            src=rx.get_upload_url(post.owner_avatar_url),
+            src=post.owner_avatar_url,
             width="34px", height="34px",
             border_radius="50%", object_fit="cover",
             border="2px solid rgba(168,85,247,0.4)",
@@ -291,12 +372,12 @@ def feed_post_card(post: rx.Base) -> rx.Component:
                 ),
                 rx.vstack(
                     rx.link(
-                        rx.text(post.owner_display_name, size="2", weight="bold", color="#111827"),
+                        rx.text(post.owner_display_name, size="2", weight="bold", color=UploadState.text_color),
                         href="/u/" + post.owner_username,
                         text_decoration="none",
                         _hover={"text_decoration": "underline"},
                     ),
-                    rx.text("@" + post.owner_username, size="1", color="#6b7280"),
+                    rx.text("@" + post.owner_username, size="1", color=UploadState.sub_text_color),
                     spacing="0", align="start",
                 ),
                 rx.spacer(),
@@ -353,7 +434,7 @@ def feed_post_card(post: rx.Base) -> rx.Component:
                             border_radius="12px",
                             cursor="pointer",
                             on_click=lambda: FeedState.set_tag_filter(t["name"]),
-                            _hover={"background": "#e5e7eb", "color": "#111827"},
+                            _hover={"background": "#e5e7eb", "color": UploadState.text_color},
                             transition="all 0.2s ease",
                         )
                     ),
@@ -384,12 +465,12 @@ def feed_post_card(post: rx.Base) -> rx.Component:
                         rx.cond(
                             post.viewer_has_liked,
                             rx.icon("heart", size=18, color="#f43f5e"),
-                            rx.icon("heart", size=18, color="#6b7280"),
+                            rx.icon("heart", size=18, color=UploadState.sub_text_color),
                         ),
                         rx.text(
                             post.like_count.to_string(),
                             size="2",
-                            color=rx.cond(post.viewer_has_liked, "#f43f5e", "#6b7280"),
+                            color=rx.cond(post.viewer_has_liked, "#f43f5e", UploadState.sub_text_color),
                             weight=rx.cond(post.viewer_has_liked, "bold", "regular"),
                         ),
                         on_click=FeedState.toggle_like(post.image_id),
@@ -404,22 +485,22 @@ def feed_post_card(post: rx.Base) -> rx.Component:
                 ),
                 rx.spacer(),
                 rx.button(
-                    rx.icon("arrow-up-right", size=15, color="#6b7280"),
+                    rx.icon("arrow-up-right", size=15, color=UploadState.sub_text_color),
                     "View profile",
                     on_click=ProfileState.goto_profile(post.owner_username),
                     variant="ghost",
                     size="1",
-                    color="#6b7280",
+                    color=UploadState.sub_text_color,
                     cursor="pointer",
                     _hover={"color": "#7c3aed"},
                 ),
                 rx.button(
-                    rx.icon("download", size=15, color="#6b7280"),
+                    rx.icon("download", size=15, color=UploadState.sub_text_color),
                     "Save",
                     on_click=rx.download(post.image_url),
                     variant="ghost",
                     size="1",
-                    color="#6b7280",
+                    color=UploadState.sub_text_color,
                     cursor="pointer",
                     _hover={"color": "#10b981", "background": "rgba(16,185,129,0.08)"},
                 ),
@@ -431,8 +512,8 @@ def feed_post_card(post: rx.Base) -> rx.Component:
             spacing="3", align="start", width="100%",
         ),
         padding="20px",
-        background="#ffffff",
-        border="1px solid #f1f1f1",
+        background=UploadState.bg_theme,
+        border="1px solid " + UploadState.border_color,
         border_radius="20px",
         _hover={
             "border_color": "rgba(168,85,247,0.35)",
@@ -450,7 +531,7 @@ def suggested_creators_sidebar() -> rx.Component:
     return rx.vstack(
         rx.hstack(
             rx.icon("sparkles", size=18, color="#a855f7"),
-            rx.text("Suggested Creators", size="3", weight="bold", color="#111827"),
+            rx.text("Suggested Creators", size="3", weight="bold", color=UploadState.text_color),
             spacing="2", align="center",
         ),
         rx.cond(
@@ -469,8 +550,8 @@ def suggested_creators_sidebar() -> rx.Component:
                             flex_shrink="0",
                         ),
                         rx.vstack(
-                            rx.text(p.display_name, size="2", weight="bold", color="#111827", line_limit=1),
-                            rx.text("@" + p.username, size="1", color="#6b7280"),
+                            rx.text(p.display_name, size="2", weight="bold", color=UploadState.text_color, line_limit=1),
+                            rx.text("@" + p.username, size="1", color=UploadState.sub_text_color),
                             spacing="0", align="start",
                         ),
                         rx.spacer(),
@@ -488,7 +569,7 @@ def suggested_creators_sidebar() -> rx.Component:
                 spacing="1", width="100%",
             ),
         ),
-        width="100%", padding="20px", background="#ffffff", border="1px solid #f1f1f1", border_radius="20px",
+        width="100%", padding="20px", background=UploadState.bg_theme, border="1px solid " + UploadState.border_color, border_radius="20px",
     )
 
 
@@ -497,7 +578,7 @@ def trending_tags_sidebar() -> rx.Component:
     return rx.vstack(
         rx.hstack(
             rx.icon("trending-up", size=18, color="#7c3aed"),
-            rx.text("Popular Topics", size="3", weight="bold", color="#111827"),
+            rx.text("Popular Topics", size="3", weight="bold", color=UploadState.text_color),
             spacing="2", align="center",
         ),
         rx.cond(
@@ -522,7 +603,7 @@ def trending_tags_sidebar() -> rx.Component:
             ),
             rx.text("No trends yet", size="2", color="#9ca3af", padding_y="10px"),
         ),
-        width="100%", padding="20px", background="#ffffff", border="1px solid #f1f1f1", border_radius="20px",
+        width="100%", padding="20px", background=UploadState.bg_theme, border="1px solid " + UploadState.border_color, border_radius="20px",
     )
 
 
@@ -536,7 +617,7 @@ def feed_tabs() -> rx.Component:
     }
     ghost_style = {
         "background": "transparent",
-        "color": "#6b7280",
+        "color": UploadState.sub_text_color,
         "border_radius": "10px",
     }
     return rx.hstack(
@@ -569,6 +650,60 @@ def feed_tabs() -> rx.Component:
 
 
 
+def feed_search_bar() -> rx.Component:
+    """Semantic search bar for filtering the community feed by meaning."""
+    return rx.box(
+        rx.hstack(
+            rx.hstack(
+                rx.icon("search", size=18, color=UploadState.sub_text_color),
+                rx.input(
+                    placeholder="Search feed by meaning (e.g. 'colorful nature')...",
+                    value=FeedState.search_query,
+                    on_change=FeedState.set_search_query,
+                    on_key_up=lambda key: rx.cond(
+                        key == "Enter",
+                        FeedState.run_semantic_search,
+                        rx.noop()
+                    ),
+                    variant="soft",
+                    size="2",
+                    width="100%",
+                    background="transparent",
+                    color=UploadState.text_color,
+                    border="none",
+                ),
+                spacing="2", align="center", flex="1",
+            ),
+            rx.cond(
+                FeedState.search_query != "",
+                rx.button(
+                    rx.icon("x", size=14),
+                    on_click=FeedState.clear_search,
+                    variant="ghost", size="1", radius="full", color=UploadState.sub_text_color,
+                ),
+            ),
+            rx.button(
+                "Search",
+                on_click=FeedState.run_semantic_search,
+                size="2", variant="ghost", color_scheme="violet",
+                loading=FeedState.loading,
+            ),
+            padding="8px 16px",
+            background=UploadState.input_bg,
+            border=f"1px solid {UploadState.border_color}",
+            border_radius="14px",
+            width="100%",
+            max_width="500px",
+            margin_bottom="10px",
+            transition="all 0.2s ease",
+            _focus_within={"background": rx.cond(UploadState.is_dark_mode, "black", "white"), "border_color": "#7c3aed"},
+        ),
+        display="flex",
+        justify_content="center",
+        width="100%",
+    )
+
+
 # ── Full page ──────────────────────────────────────────────────────────────────
 
 def feed_page() -> rx.Component:
@@ -584,22 +719,24 @@ def feed_page() -> rx.Component:
                             rx.icon("rss", size=28, color="#a855f7"),
                             rx.heading(
                                 "Feed",
-                                size="7", color="#111827", weight="bold", letter_spacing="-0.5px",
+                                size="7", color=UploadState.text_color, weight="bold", letter_spacing="-0.5px",
                             ),
                             spacing="3", align="center",
                         ),
                         rx.text(
                             "Recent public photos from the community",
-                            size="3", color="#6b7280",
+                            size="3", color=UploadState.sub_text_color,
                         ),
                         spacing="2", align="center",
                     ),
+
+                    feed_search_bar(),
 
                     # Active Tag Indicator
                     rx.cond(
                         FeedState.tag_filter != "",
                         rx.hstack(
-                            rx.text("Filtering by topic:", size="2", color="#6b7280"),
+                            rx.text("Filtering by topic:", size="2", color=UploadState.sub_text_color),
                             rx.box(
                                 rx.hstack(
                                     rx.icon("tag", size=14),
@@ -626,7 +763,7 @@ def feed_page() -> rx.Component:
                         rx.center(
                             rx.vstack(
                                 rx.spinner(size="3", color="#a855f7"),
-                                rx.text("Loading feed…", size="2", color="#6b7280"),
+                                rx.text("Loading feed…", size="2", color=UploadState.sub_text_color),
                                 spacing="3", align="center",
                             ),
                             padding_y="80px",
@@ -696,7 +833,7 @@ def feed_page() -> rx.Component:
                     trending_tags_sidebar(),
                     rx.vstack(
                         rx.text("About turkey.app", size="1", color="#9ca3af", weight="bold", letter_spacing="1px"),
-                        rx.text("A premium social media experience for photographers and collectors.", size="1", color="#6b7280"),
+                        rx.text("A premium social media experience for photographers and collectors.", size="1", color=UploadState.sub_text_color),
                         spacing="2", align="start",
                         padding="20px", background="#f9fafb", border_radius="20px", width="100%",
                     ),
@@ -717,6 +854,6 @@ def feed_page() -> rx.Component:
             justify_content="center",
         ),
         min_height="100vh",
-        background="#ffffff",
+        background=UploadState.bg_theme,
         width="100%",
     )

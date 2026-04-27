@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from TurkeyApp.models import ImageRecord, Folder, Tag, ImageTag
 from TurkeyApp.portfolio_utils import generate_portfolio_html
 from TurkeyApp.image_support import get_image_data_uri
+from TurkeyApp.ai_utils import get_image_embeddings, upsert_to_pinecone
 
 # Constants
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024        # 10 MB hard limit
@@ -104,7 +105,9 @@ class UploadState(rx.State):
 
     # ---- Bulk selection ----
     selected_image_ids: list[int] = []
+    last_selected_id: int = 0
     selection_mode: bool = False
+    show_exif_panel: bool = False
 
     # ---- User preferences (cookie-persisted) ----
     settings_open: bool = False
@@ -117,6 +120,41 @@ class UploadState(rx.State):
     accent_light: str = rx.Cookie("#a855f7", name="pref_accent_light", max_age=31536000)
     card_size: str = rx.Cookie("medium", name="pref_card_size", max_age=31536000)
     show_stats_bar: bool = True
+
+    # ── Theme Vars ────────────────────────────
+    @rx.var
+    def is_dark_mode(self) -> bool:
+        return self.bg_theme != "#ffffff"
+
+    @rx.var
+    def text_color(self) -> str:
+        return "#ffffff" if self.bg_theme != "#ffffff" else "#111827"
+
+    @rx.var
+    def sub_text_color(self) -> str:
+        return "#9ca3af" if self.bg_theme != "#ffffff" else "#6b7280"
+
+    @rx.var
+    def bg_card(self) -> str:
+        return "#1f2937" if self.bg_theme != "#ffffff" else "#ffffff"
+
+    @rx.var
+    def border_color(self) -> str:
+        return "#374151" if self.bg_theme != "#ffffff" else "#f1f1f1"
+
+    @rx.var
+    def input_bg(self) -> str:
+        return "#111827" if self.bg_theme != "#ffffff" else "#f1f1f1"
+
+    @rx.var
+    def nav_bg(self) -> str:
+        return "#111827" if self.bg_theme != "#ffffff" else "#ffffff"
+
+    def toggle_dark_mode(self):
+        if self.is_dark_mode:
+            self.bg_theme = "#ffffff"
+        else:
+            self.bg_theme = "#0a0a0a" # Pure dark for brutalist feel
 
 
     # ── Computed ──────────────────────────────
@@ -249,6 +287,18 @@ class UploadState(rx.State):
         return ""
 
     @rx.var
+    def lightbox_exif(self) -> dict:
+        imgs = self.filtered_images
+        if 0 <= self.preview_index < len(imgs):
+            info = imgs[self.preview_index].exif_info
+            if info:
+                try: 
+                    import json
+                    return json.loads(info)
+                except: pass
+        return {}
+
+    @rx.var
     def lightbox_folder(self) -> str:
         imgs = self.filtered_images
         if 0 <= self.preview_index < len(imgs):
@@ -311,6 +361,9 @@ class UploadState(rx.State):
 
     def toggle_stats_bar(self, checked: bool):
         self.show_stats_bar = checked
+
+    def toggle_exif_panel(self):
+        self.show_exif_panel = not self.show_exif_panel
 
     def set_card_size(self, size: str):
         self.card_size = size
@@ -543,13 +596,59 @@ class UploadState(rx.State):
                 (i for i, img in enumerate(self.filtered_images) if img.id == image_id),
                 -1,
             )
-            self.open_preview(filename)
+            return self.open_preview(filename)
+
+    def select_image(self, image_id: int, filename: str, is_shift: bool = False):
+        """Advanced selection with Shift+Click support."""
+        if not self.selection_mode:
+            self.on_image_click(image_id, filename)
+            return
+
+        active_ids = [img.id for img in self.filtered_images if img.id is not None]
+        
+        if not is_shift or self.last_selected_id not in active_ids:
+            # Single toggle
+            if image_id in self.selected_image_ids:
+                self.selected_image_ids = [i for i in self.selected_image_ids if i != image_id]
+            else:
+                self.selected_image_ids = self.selected_image_ids + [image_id]
+            self.last_selected_id = image_id
+            return
+
+        # Range toggle
+        try:
+            start_idx = active_ids.index(self.last_selected_id)
+            end_idx = active_ids.index(image_id)
+            low, high = min(start_idx, end_idx), max(start_idx, end_idx)
+            
+            range_set = set(active_ids[low : high + 1])
+            current_set = set(self.selected_image_ids)
+            
+            # If the clicked item is already selected, deselect the range
+            if image_id in current_set:
+                self.selected_image_ids = list(current_set - range_set)
+            else:
+                self.selected_image_ids = list(current_set | range_set)
+                
+            self.last_selected_id = image_id
+        except Exception:
+            pass
 
     def select_all(self):
         self.selected_image_ids = [img.id for img in self.filtered_images]
 
     def clear_selection(self):
         self.selected_image_ids = []
+
+    def copy_public_folder_link(self):
+        """Generates and copies a public link to the current folder on the user's profile."""
+        if not self.folder_filter: return
+        # Using a friendly URL structure
+        url = f"https://turkey.app/u/{self.user_name}?folder={self.folder_filter}"
+        self.upload_status = "success"
+        self.upload_message = "🚀 Public collection link copied!"
+        self.toast_visible = True
+        return rx.set_clipboard(url)
 
     def bulk_delete(self):
         ids = list(self.selected_image_ids)
@@ -946,7 +1045,7 @@ class UploadState(rx.State):
                     errors.append(f"{name}: Compression failed — {e}")
                     continue
 
-            self._save_image(name, final_data, final_mime, size, was_compressed)
+            await self._save_image(name, final_data, final_mime, size, was_compressed)
             existing.add(name)
             successes += 1
 
@@ -971,7 +1070,7 @@ class UploadState(rx.State):
         self._refresh_images()
         self._recalc_storage()
 
-    def confirm_duplicate_upload(self):
+    async def confirm_duplicate_upload(self):
         self.show_duplicate_modal = False
         for item in self.pending_upload_data:
             data = base64.b64decode(item["data_b64"])
@@ -987,7 +1086,7 @@ class UploadState(rx.State):
                     was_compressed = True
                 except Exception:
                     pass
-            self._save_image(name, final_data, final_mime, size, was_compressed)
+            await self._save_image(name, final_data, final_mime, size, was_compressed)
         self.pending_upload_data = []
         self.pending_duplicates = []
         self._refresh_images()
@@ -1013,14 +1112,17 @@ class UploadState(rx.State):
         img.save(buf, format="JPEG", optimize=True, quality=75)
         return buf.getvalue(), "image/jpeg"
 
-    def _save_image(self, original_name: str, data: bytes, mime: str, original_size: int, was_compressed: bool):
+    async def _save_image(self, original_name: str, data: bytes, mime: str, original_size: int, was_compressed: bool):
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         safe_name = f"{ts}_{original_name.replace(' ', '_')}"
         filepath = os.path.join(UPLOAD_DIR, safe_name)
         with open(filepath, "wb") as f:
             f.write(data)
+        import json
+        exif_json = self._extract_exif(data)
+        
         with rx.session() as session:
-            session.add(ImageRecord(
+            new_image = ImageRecord(
                 filename=safe_name,
                 original_filename=original_name,
                 folder_name=self.selected_folder,
@@ -1029,8 +1131,56 @@ class UploadState(rx.State):
                 size_bytes=len(data),
                 was_compressed=was_compressed,
                 created_at=datetime.datetime.now().isoformat(),
-            ))
+                exif_info=exif_json,
+            )
+            session.add(new_image)
             session.commit()
+            session.refresh(new_image)
+            image_id = str(new_image.id)
+
+        # ─── B. Trigger the AI Pipeline (Capstone Logic) ───────────────────────────
+        try:
+            # 1. Get Embeddings from Hugging Face
+            vector = await get_image_embeddings(data)
+            
+            # 2. Upsert to Pinecone if vector is valid
+            if vector and isinstance(vector, list):
+                metadata = {
+                    "filename": original_name,
+                    "folder": self.selected_folder,
+                    "location": "TurkeyApp_Library", # Custom tag for your Capstone
+                    "upload_date": datetime.datetime.now().isoformat()
+                }
+                await upsert_to_pinecone(image_id, vector, metadata)
+                print(f"AI: Successfully indexed image {image_id}")
+        except Exception as ai_err:
+            print(f"AI Pipeline Warning: {ai_err}")
+            # We don't block the upload if AI fails, as per your "Consistency" rule.
+
+    def _extract_exif(self, data: bytes) -> str:
+        """Helper to extract EXIF metadata from image bytes."""
+        try:
+            import json, io
+            from PIL import Image as PILImage
+            from PIL.ExifTags import TAGS
+            
+            img = PILImage.open(io.BytesIO(data))
+            info = img.getexif()
+            if not info: return ""
+            
+            exif_data = {}
+            for tag, value in info.items():
+                decoded = TAGS.get(tag, tag)
+                # Convert common non-serializable types to string
+                if isinstance(value, bytes):
+                    try: value = value.decode()
+                    except: value = str(value)
+                elif not isinstance(value, (str, int, float, bool)):
+                    value = str(value)
+                exif_data[str(decoded)] = value
+            return json.dumps(exif_data)
+        except:
+            return ""
 
     # ── Export ────────────────────────────────────────
     def export_folder(self, folder_name: str):

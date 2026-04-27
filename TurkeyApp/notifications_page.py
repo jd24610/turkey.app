@@ -2,6 +2,7 @@
 
 import reflex as rx
 from TurkeyApp.profile_state import ProfileState
+from TurkeyApp.upload_state import UploadState
 from TurkeyApp.navbar import navbar
 
 def notification_row(notif: rx.Base) -> rx.Component:
@@ -9,8 +10,8 @@ def notification_row(notif: rx.Base) -> rx.Component:
     return rx.box(
         rx.hstack(
             rx.vstack(
-                rx.text(notif.message, size="3", color="#111827", weight="medium"),
-                rx.text(notif.created_at, size="1", color="#6b7280"),
+                rx.text(notif.message, size="3", color=UploadState.text_color, weight="medium"),
+                rx.text(notif.created_at, size="1", color=UploadState.sub_text_color),
                 spacing="1", align="start",
                 flex="1",
             ),
@@ -44,7 +45,7 @@ def notification_row(notif: rx.Base) -> rx.Component:
             spacing="4", align="center", width="100%", padding="16px",
         ),
         background="white",
-        border="1px solid #f1f1f1",
+        border="1px solid " + UploadState.border_color,
         border_radius="12px",
         margin_bottom="12px",
         _hover={"border_color": "#7c3aed", "box_shadow": "0 4px 12px rgba(0,0,0,0.03)"},
@@ -61,10 +62,10 @@ def notifications_page() -> rx.Component:
                 rx.vstack(
                     rx.hstack(
                         rx.icon("bell", size=28, color="#a855f7"),
-                        rx.heading("Notifications", size="8", color="#111827", weight="bold"),
+                        rx.heading("Notifications", size="8", color=UploadState.text_color, weight="bold"),
                         spacing="3", align="center",
                     ),
-                    rx.text("Keep track of likes, follows, and community updates.", size="3", color="#6b7280"),
+                    rx.text("Keep track of likes, follows, and community updates.", size="3", color=UploadState.sub_text_color),
                     spacing="2", align="center",
                 ),
 
@@ -95,5 +96,5 @@ def notifications_page() -> rx.Component:
             justify_content="center",
         ),
         min_height="100vh",
-        background="#ffffff",
+        background=UploadState.bg_theme,
     )

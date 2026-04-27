@@ -16,11 +16,11 @@ def _nav_link(label: str, icon: str, route: str, is_active: bool = False) -> rx.
             align="center",
             padding="10px 18px",
             border_radius="99px",
-            background=rx.cond(is_active, "#111827", "transparent"),
-            color=rx.cond(is_active, "white", "#111827"),
+            background=rx.cond(is_active, UploadState.text_color, "transparent"),
+            color=rx.cond(is_active, UploadState.nav_bg, UploadState.text_color),
             _hover={
                 "background": "rgba(0,0,0,0.05)",
-                "color": "#111827",
+                "color": UploadState.text_color,
             } if not is_active else {},
             transition="all 0.2s ease",
         ),
@@ -48,7 +48,7 @@ def _profile_avatar_btn() -> rx.Component:
                         flex_shrink="0",
                     ),
                     rx.box(
-                        rx.text(ProfileState.own_initials, size="1", weight="bold", color="white"),
+                        rx.text(ProfileState.own_initials, size="1", weight="bold", color=UploadState.nav_bg),
                         width="28px", height="28px",
                         border_radius="50%",
                         background="linear-gradient(135deg, #7c3aed, #a855f7)",
@@ -57,7 +57,7 @@ def _profile_avatar_btn() -> rx.Component:
                         flex_shrink="0",
                     ),
                 ),
-                rx.text(ProfileState.own_display_name, size="2", weight="bold", color="#111827"),
+                rx.text(ProfileState.own_display_name, size="2", weight="bold", color=UploadState.text_color),
                 spacing="2", align="center",
                 padding="6px 14px 6px 6px",
                 border_radius="99px",
@@ -73,7 +73,7 @@ def _profile_avatar_btn() -> rx.Component:
             State.user_name != "",
             rx.hstack(
                 rx.icon("circle-user-round", size=18, color="#7c3aed"),
-                rx.text(State.user_name, size="2", color="#111827"),
+                rx.text(State.user_name, size="2", color=UploadState.text_color),
                 spacing="2", align="center",
                 padding="8px 16px",
                 border_radius="99px",
@@ -99,7 +99,7 @@ def navbar(active_page: str = "") -> rx.Component:
                     box_shadow="0 4px 12px rgba(124,58,237,0.2)",
                 ),
                 rx.hstack(
-                    rx.text("turkey", size="4", weight="bold", color="#111827", letter_spacing="-0.5px"),
+                    rx.text("turkey", size="4", weight="bold", color=UploadState.text_color, letter_spacing="-0.5px"),
                     rx.text(".app", size="4", weight="bold", color="#7c3aed", letter_spacing="-0.5px"),
                     spacing="0",
                 ),
@@ -121,7 +121,7 @@ def navbar(active_page: str = "") -> rx.Component:
 
         # ── Center: Search Bar (Pinterest style) ─────────────────────────
         rx.hstack(
-            rx.icon("search", size=16, color="#6b7280"),
+            rx.icon("search", size=16, color=UploadState.sub_text_color),
             rx.input(
                 placeholder="Search...",
                 value=ProfileState.search_query,
@@ -135,8 +135,8 @@ def navbar(active_page: str = "") -> rx.Component:
                 variant="soft",
                 background="transparent",
                 border="none",
-                color="#111827",
-                _placeholder={"color": "#6b7280"},
+                color=UploadState.text_color,
+                _placeholder={"color": UploadState.sub_text_color},
                 _focus={"outline": "none", "border": "none", "box_shadow": "none"},
                 flex="1",
                 padding="0",
@@ -152,7 +152,7 @@ def navbar(active_page: str = "") -> rx.Component:
             spacing="2",
             border="1px solid transparent",
             _hover={"background": "#e2e2e2"},
-            _focus_within={"background": "white", "border_color": "#111827", "box_shadow": "0 0 0 4px rgba(0,0,0,0.05)"},
+            _focus_within={"background": UploadState.nav_bg, "border_color": UploadState.text_color, "box_shadow": "0 0 0 4px rgba(0,0,0,0.05)"},
             transition="all 0.2s ease",
             cursor="text",
         ),
@@ -168,8 +168,8 @@ def navbar(active_page: str = "") -> rx.Component:
                     "Sign In",
                     on_click=rx.redirect("/"),
                     size="2",
-                    background="#111827",
-                    color="white",
+                    background=UploadState.text_color,
+                    color=UploadState.nav_bg,
                     border_radius="99px",
                     padding="0 24px",
                     cursor="pointer",
@@ -181,13 +181,13 @@ def navbar(active_page: str = "") -> rx.Component:
                     rx.popover.root(
                         rx.popover.trigger(
                             rx.box(
-                                rx.icon("bell", size=18, color="#111827"),
+                                rx.icon("bell", size=18, color=UploadState.text_color),
                                 rx.cond(
                                     ProfileState.unread_notifications_count > 0,
                                     rx.box(
                                         rx.text(
                                             ProfileState.unread_notifications_count.to_string(),
-                                            size="1", weight="bold", color="white",
+                                            size="1", weight="bold", color=UploadState.nav_bg,
                                         ),
                                         position="absolute", top="-4px", right="-4px",
                                         background="#f43f5e",
@@ -207,7 +207,7 @@ def navbar(active_page: str = "") -> rx.Component:
                         ),
                         rx.popover.content(
                             rx.vstack(
-                                rx.text("Notifications", size="3", weight="bold", color="#111827"),
+                                rx.text("Notifications", size="3", weight="bold", color=UploadState.text_color),
                                 rx.divider(),
                                 rx.cond(
                                     ProfileState.notifications.length() > 0,
@@ -216,8 +216,8 @@ def navbar(active_page: str = "") -> rx.Component:
                                             ProfileState.notifications,
                                             lambda n: rx.hstack(
                                                 rx.vstack(
-                                                    rx.text(n.message, size="2", color="#111827", width="100%"),
-                                                    rx.text(n.created_at, size="1", color="#6b7280"),
+                                                    rx.text(n.message, size="2", color=UploadState.text_color, width="100%"),
+                                                    rx.text(n.created_at, size="1", color=UploadState.sub_text_color),
                                                     spacing="1", align="start",
                                                     width="160px",
                                                 ),
@@ -247,7 +247,7 @@ def navbar(active_page: str = "") -> rx.Component:
                                         spacing="0", width="100%",
                                     ),
                                     rx.center(
-                                        rx.text("No notifications", size="2", color="#6b7280"),
+                                        rx.text("No notifications", size="2", color=UploadState.sub_text_color),
                                         padding_y="20px",
                                         width="100%",
                                     ),
@@ -275,9 +275,22 @@ def navbar(active_page: str = "") -> rx.Component:
                     ),
                     _profile_avatar_btn(),
                     rx.button(
+                        rx.cond(
+                            UploadState.is_dark_mode,
+                            rx.icon("sun", size=18),
+                            rx.icon("moon", size=18),
+                        ),
+                        on_click=UploadState.toggle_dark_mode,
+                        size="2", variant="ghost", color=UploadState.text_color,
+                        padding="8px", border_radius="50%",
+                        _hover={"background": rx.cond(UploadState.is_dark_mode, "rgba(255,255,255,0.1)", "rgba(0,0,0,0.05)")},
+                        cursor="pointer",
+                        title="Toggle Theme",
+                    ),
+                    rx.button(
                         rx.icon("settings", size=18),
                         on_click=UploadState.toggle_settings,
-                        size="2", variant="ghost", color="#111827",
+                        size="2", variant="ghost", color=UploadState.text_color,
                         padding="8px", border_radius="50%",
                         _hover={"background": "rgba(0,0,0,0.05)"},
                         cursor="pointer",
@@ -286,7 +299,7 @@ def navbar(active_page: str = "") -> rx.Component:
                     rx.button(
                         rx.icon("log-out", size=18),
                         on_click=State.logout,
-                        size="2", variant="ghost", color="#6b7280",
+                        size="2", variant="ghost", color=UploadState.sub_text_color,
                         padding="8px", border_radius="50%",
                         _hover={"background": "rgba(239,68,68,0.08)", "color": "#ef4444"},
                         cursor="pointer",
@@ -302,8 +315,8 @@ def navbar(active_page: str = "") -> rx.Component:
         align="center",
         padding="0 24px",
         height="76px",
-        background="white",
-        border_bottom="1px solid #f1f1f1",
+        background=UploadState.nav_bg,
+        border_bottom="1px solid " + UploadState.border_color,
         position="sticky",
         top="0",
         z_index="1000",

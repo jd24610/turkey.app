@@ -2,6 +2,7 @@
 
 import reflex as rx
 from TurkeyApp.profile_state import ProfileState
+from TurkeyApp.upload_state import UploadState
 
 
 def _input_style() -> dict:
@@ -9,7 +10,7 @@ def _input_style() -> dict:
         "background": "#ffffff",
         "border": "1px solid #e2e2e2",
         "border_radius": "12px",
-        "color": "#111827",
+        "color": UploadState.text_color,
         "_placeholder": {"color": "#9ca3af"},
         "_focus": {"border_color": "#7c3aed", "box_shadow": "0 0 0 3px rgba(124,58,237,0.1)"},
     }
@@ -41,8 +42,8 @@ def edit_profile_modal() -> rx.Component:
                     # Header
                     rx.hstack(
                         rx.vstack(
-                            rx.heading("Edit Profile", size="6", color="#111827"),
-                            rx.text("Update your personal information and privacy", size="2", color="#6b7280"),
+                            rx.heading("Edit Profile", size="6", color=UploadState.text_color),
+                            rx.text("Update your personal information and privacy", size="2", color=UploadState.sub_text_color),
                             spacing="1", align="start",
                         ),
                         rx.button(
@@ -50,7 +51,7 @@ def edit_profile_modal() -> rx.Component:
                             on_click=ProfileState.toggle_edit_profile,
                             variant="ghost",
                             color_scheme="gray",
-                            color="#6b7280",
+                            color=UploadState.sub_text_color,
                         ),
                         justify="between",
                         width="100%",
@@ -174,11 +175,11 @@ def edit_profile_modal() -> rx.Component:
                                 rx.cond(
                                     ProfileState.banner_error != "",
                                     rx.text(ProfileState.banner_error, size="1", color="#ef4444"),
-                                    rx.text("Recommended: 1500x500px or wide aspect ratio", size="1", color="#6b7280"),
+                                    rx.text("Recommended: 1500x500px or wide aspect ratio", size="1", color=UploadState.sub_text_color),
                                 ),
                                 spacing="2", align="start", width="100%",
                                 padding="12px 0",
-                                border_bottom="1px solid #f1f1f1",
+                                border_bottom="1px solid " + UploadState.border_color,
                             ),
 
                             # Display name
@@ -240,12 +241,12 @@ def edit_profile_modal() -> rx.Component:
                                     rx.vstack(
                                         rx.hstack(
                                             rx.icon("globe", size=16, color="#7c3aed"),
-                                            rx.text("Public Profile", size="3", weight="medium", color="#111827"),
+                                            rx.text("Public Profile", size="3", weight="medium", color=UploadState.text_color),
                                             spacing="2", align="center",
                                         ),
                                         rx.text(
                                             "Allow others to find and view your library",
-                                            size="2", color="#6b7280",
+                                            size="2", color=UploadState.sub_text_color,
                                         ),
                                         spacing="1", align="start",
                                     ),
@@ -260,7 +261,7 @@ def edit_profile_modal() -> rx.Component:
                                 ),
                                 padding="16px 20px",
                                 background="#f9fafb",
-                                border="1px solid #f1f1f1",
+                                border="1px solid " + UploadState.border_color,
                                 border_radius="14px",
                                 width="100%",
                             ),
@@ -315,7 +316,7 @@ def edit_profile_modal() -> rx.Component:
                     width="100%",
                 ),
                 padding="32px",
-                background="#ffffff",
+                background=UploadState.bg_theme,
                 border="1px solid #e5e7eb",
                 border_radius="24px",
                 box_shadow="0 30px 60px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.02)",

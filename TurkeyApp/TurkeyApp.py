@@ -45,7 +45,7 @@ def login_page() -> rx.Component:
                             "turkey",
                             size="7",
                             weight="bold",
-                            color="#111827",
+                            color=UploadState.text_color,
                             letter_spacing="-1px",
                         ),
                         rx.text(
@@ -60,7 +60,7 @@ def login_page() -> rx.Component:
                     rx.text(
                         "Your intelligent media library",
                         size="2",
-                        color="#6b7280",
+                        color=UploadState.sub_text_color,
                         letter_spacing="0.5px",
                     ),
                     spacing="4",
@@ -70,8 +70,8 @@ def login_page() -> rx.Component:
                 # Login card
                 rx.box(
                     rx.vstack(
-                        rx.text("Sign in to continue", size="3", color="#111827", weight="medium"),
-                        rx.divider(color="#f1f1f1"),
+                        rx.text("Sign in to continue", size="3", color=UploadState.text_color, weight="medium"),
+                        rx.divider(color=UploadState.border_color),
                         rx.cond(
                             State.is_authenticated,
                             rx.vstack(
@@ -109,9 +109,9 @@ def login_page() -> rx.Component:
                                 google_login(on_success=State.on_success),
                                 # ── Divider ──
                                 rx.hstack(
-                                    rx.divider(flex="1", color="#f1f1f1"),
+                                    rx.divider(flex="1", color=UploadState.border_color),
                                     rx.text("or", size="1", color="#9ca3af", padding_x="10px"),
-                                    rx.divider(flex="1", color="#f1f1f1"),
+                                    rx.divider(flex="1", color=UploadState.border_color),
                                     width="100%",
                                     align="center",
                                 ),
@@ -126,7 +126,7 @@ def login_page() -> rx.Component:
                                     color_scheme="gray",
                                     border_radius="12px",
                                     cursor="pointer",
-                                    border="1px solid #e5e7eb",
+                                    border="1px solid " + UploadState.border_color,
                                     color="#4b5563",
                                     _hover={
                                         "background": "#f9fafb",
@@ -150,8 +150,8 @@ def login_page() -> rx.Component:
                         width="100%",
                     ),
                     padding="40px",
-                    background="#ffffff",
-                    border="1px solid #e5e7eb",
+                    background=UploadState.bg_theme,
+                    border="1px solid " + UploadState.border_color,
                     border_radius="32px",
                     box_shadow="0 30px 60px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.02)",
                     width="400px",
@@ -163,7 +163,7 @@ def login_page() -> rx.Component:
                 min_height="100vh",
             ),
             min_height="100vh",
-            background="#f9fafb",
+            background=UploadState.bg_theme,
             display="flex",
             align_items="center",
             justify_content="center",
@@ -197,8 +197,8 @@ def library_page() -> rx.Component:
         rx.box(
             rx.vstack(
                 rx.icon("lock", size=48, color="#7c3aed"),
-                rx.heading("Access Restricted", size="6", color="#111827"),
-                rx.text("Please sign in to access the media library.", size="3", color="#6b7280"),
+                rx.heading("Access Restricted", size="6", color=UploadState.text_color),
+                rx.text("Please sign in to access the media library.", size="3", color=UploadState.sub_text_color),
                 rx.button(
                     "Go to Login",
                     on_click=rx.redirect("/"),
@@ -214,7 +214,7 @@ def library_page() -> rx.Component:
                 min_height="100vh",
             ),
             min_height="100vh",
-            background="#ffffff",
+            background=UploadState.bg_theme,
             display="flex",
             align_items="center",
             justify_content="center",
@@ -235,5 +235,5 @@ app.add_page(login_page, route="/", on_load=State.on_app_load, title="turkey.app
 app.add_page(library_page, route="/library", on_load=[State.on_app_load, UploadState.on_load], title="My Library • turkey.app")
 app.add_page(public_profile_page, route="/u/[username]", on_load=ProfileState.load_public_profile, title="Profile • turkey.app")
 app.add_page(search_page, route="/search", on_load=[State.on_app_load, ProfileState.run_search], title="Discover People • turkey.app")
-app.add_page(feed_page, route="/feed", on_load=[State.on_app_load, FeedState.load_feed], title="Feed • turkey.app")
+app.add_page(feed_page, route="/feed", on_load=[State.on_app_load, FeedState.load_posts], title="Feed • turkey.app")
 app.add_page(notifications_page, route="/notifications", on_load=[State.on_app_load, ProfileState.load_notifications], title="Notifications • turkey.app")

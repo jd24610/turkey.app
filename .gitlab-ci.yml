@@ -13,6 +13,6 @@ deploy-reflex:
     - source .venv/bin/activate
     - reflex deploy --project turkey-app
   only:
-    - main
+    - joeBranch
   variables:
     REFLEX_TOKEN: $REFLEX_TOKEN

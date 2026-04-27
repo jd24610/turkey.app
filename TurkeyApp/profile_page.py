@@ -2,6 +2,7 @@
 
 import reflex as rx
 from TurkeyApp.profile_state import ProfileState
+from TurkeyApp.upload_state import UploadState
 from TurkeyApp.navbar import navbar
 
 
@@ -30,7 +31,7 @@ def profile_toast() -> rx.Component:
             transform="translateX(-50%)",
             z_index="9999",
             padding="12px 20px",
-            background="#111827",
+            background=UploadState.text_color,
             border_radius="14px",
             box_shadow="0 8px 32px rgba(0,0,0,0.25)",
             white_space="nowrap",
@@ -81,7 +82,7 @@ def profile_header() -> rx.Component:
                 margin_top="-80px",
                 z_index="10",
             ),
-            rx.heading(ProfileState.viewed_display_name, size="8", color="#111827", weight="bold"),
+            rx.heading(ProfileState.viewed_display_name, size="8", color=UploadState.text_color, weight="bold"),
             rx.text("@" + ProfileState.viewed_username, size="3", color="#7c3aed", weight="medium"),
             rx.text(ProfileState.viewed_bio, size="4", color="#4b5563", text_align="center", max_width="600px", margin_top="12px"),
             
@@ -124,8 +125,8 @@ def profile_stats() -> rx.Component:
     def stat(icon: str, value: rx.Var, label: str) -> rx.Component:
         return rx.hstack(
             rx.icon(icon, size=16, color="#7c3aed"),
-            rx.text(value.to_string(), size="2", weight="bold", color="#111827"),
-            rx.text(label, size="2", color="#6b7280"),
+            rx.text(value.to_string(), size="2", weight="bold", color=UploadState.text_color),
+            rx.text(label, size="2", color=UploadState.sub_text_color),
             spacing="2", align="center",
         )
 
@@ -141,7 +142,7 @@ def profile_stats() -> rx.Component:
             rx.box(width="1px", height="16px", background="#e5e7eb"),
             rx.hstack(
                 rx.icon("calendar", size=16, color="#7c3aed"),
-                rx.text(ProfileState.viewed_member_since_text, size="2", color="#6b7280"),
+                rx.text(ProfileState.viewed_member_since_text, size="2", color=UploadState.sub_text_color),
                 spacing="2", align="center",
             ),
             # Share
@@ -154,7 +155,7 @@ def profile_stats() -> rx.Component:
             ),
             spacing="5", align="center", width="100%", max_width="1200px", padding_x="24px",
         ),
-        width="100%", border_top="1px solid #f1f1f1", border_bottom="1px solid #f1f1f1", padding_y="16px",
+        width="100%", border_top="1px solid #f1f1f1", border_bottom="1px solid " + UploadState.border_color, padding_y="16px",
     )
 
 
@@ -170,8 +171,8 @@ def profile_tabs() -> rx.Component:
             display="flex", align_items="center",
             cursor="pointer",
             border_bottom=rx.cond(is_active, "2px solid #7c3aed", "2px solid transparent"),
-            color=rx.cond(is_active, "#111827", "#6b7280"),
-            _hover={"color": "#111827"},
+            color=rx.cond(is_active, UploadState.text_color, UploadState.sub_text_color),
+            _hover={"color": UploadState.text_color},
             transition="all 0.2s ease",
         )
     return rx.center(
@@ -181,7 +182,7 @@ def profile_tabs() -> rx.Component:
             spacing="1", align="center", height="50px",
         ),
         width="100%",
-        border_bottom="1px solid #f1f1f1",
+        border_bottom="1px solid " + UploadState.border_color,
         margin_bottom="32px",
     )
 
@@ -221,13 +222,13 @@ def profile_gallery_header() -> rx.Component:
                     rx.icon("folder-open", size=18, color="#7c3aed"),
                     rx.heading(
                         ProfileState.viewed_active_folder,
-                        size="5", color="#111827", weight="bold"
+                        size="5", color=UploadState.text_color, weight="bold"
                     ),
                     spacing="2", align="center",
                 ),
                 rx.text(
                     "Showing images from this collection",
-                    size="2", color="#6b7280"
+                    size="2", color=UploadState.sub_text_color
                 ),
                 spacing="1", align="start",
             ),
@@ -304,13 +305,13 @@ def collections_grid() -> rx.Component:
                             width="100%", overflow="hidden",
                         ),
                         rx.vstack(
-                            rx.text(c["name"], size="4", weight="bold", color="#111827"),
+                            rx.text(c["name"], size="4", weight="bold", color=UploadState.text_color),
                             rx.cond(
                                 c["description"] != "",
                                 rx.text(c["description"], size="2", color="#4b5563", line_limit=2),
                                 rx.box(),
                             ),
-                            rx.text(c["count_text"], size="2", color="#6b7280"),
+                            rx.text(c["count_text"], size="2", color=UploadState.sub_text_color),
                             spacing="1", align="start",
                         ),
                         spacing="3", align="start", width="100%",
@@ -369,7 +370,7 @@ def profile_lightbox() -> rx.Component:
                 # RIGHT: Comments Panel
                 rx.box(
                     rx.vstack(
-                        rx.text("Comments", size="4", weight="bold", color="#111827"),
+                        rx.text("Comments", size="4", weight="bold", color=UploadState.text_color),
                         rx.divider(),
                         rx.box(
                             rx.foreach(
@@ -440,5 +441,5 @@ def public_profile_page() -> rx.Component:
                 ),
             ),
         ),
-        min_height="100vh", background="#ffffff",
+        min_height="100vh", background=UploadState.bg_theme,
     )

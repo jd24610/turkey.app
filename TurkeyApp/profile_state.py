@@ -7,6 +7,7 @@ import reflex as rx
 import sqlmodel
 from datetime import datetime
 from pydantic import BaseModel
+from typing import Union, List, Optional
 
 from TurkeyApp.models import UserProfile, ImageRecord, Follow, Like, Notification, Comment
 
@@ -30,6 +31,15 @@ class SearchResult(BaseModel):
     image_count: int = 0
     image_count_str: str = "0"
     follower_count: int = 0
+
+
+class SemanticImageResult(BaseModel):
+    """Result for AI-driven image search."""
+    id: int = 0
+    filename: str = ""
+    full_url: str = ""
+    caption: str = ""
+    owner_username: str = ""
 
 
 # ─────────────────────────────────────────────
@@ -127,6 +137,8 @@ class ProfileState(rx.State):
     # ── Search / discovery ───────────────────
     search_query: str = ""
     search_results: list[SearchResult] = []
+    image_search_results: list[SemanticImageResult] = []
+    search_mode: str = "profiles"  # "profiles" or "images"
     search_loading: bool = False
     search_done: bool = False
 
@@ -585,7 +597,23 @@ class ProfileState(rx.State):
     def set_search_query(self, q: str):
         self.search_query = q
 
-    def run_search(self):
+    def set_search_mode(self, mode: Union[str, List[str]]):
+        # Even if it's a list (unlikely here), we take the first or cast to str
+        if isinstance(mode, list):
+            self.search_mode = str(mode[0]) if mode else "profiles"
+        else:
+            self.search_mode = mode
+        self.search_done = False
+        self.search_results = []
+        self.image_search_results = []
+
+    async def run_search(self):
+        """Dispatches search based on current mode."""
+        if self.search_mode == "images":
+            return await self.run_image_search()
+        return self.run_profile_search()
+
+    def run_profile_search(self):
         """Search public profiles by username or display name."""
         # Handle query from URL parameters if present
         q_param = self.router.page.params.get("q")
@@ -635,6 +663,71 @@ class ProfileState(rx.State):
             self.search_done = True
         except Exception:
             self.search_results = []
+            self.search_done = True
+        finally:
+            self.search_loading = False
+    async def run_image_search(self):
+        """Semantic search for images via Pinecone/CLIP AI."""
+        q = self.search_query.strip()
+        if not q:
+            self.image_search_results = []
+            self.search_done = False
+            return
+
+        self.search_loading = True
+        self.image_search_results = []
+        try:
+            from TurkeyApp.ai_utils import get_text_embeddings, query_pinecone
+            # 1. Get Text Vector
+            vector = await get_text_embeddings(q)
+            if not vector or not isinstance(vector, list):
+                self.search_done = True
+                return
+
+            # 2. Search Pinecone
+            match_ids = await query_pinecone(vector)
+            if not match_ids:
+                self.search_done = True
+                return
+
+            # 3. Retrieve DB records for matches
+            with rx.session() as session:
+                # Resolve int IDs for SQLite
+                int_ids = []
+                for mid in match_ids:
+                    try: int_ids.append(int(mid))
+                    except: pass
+                
+                if not int_ids:
+                    self.search_done = True
+                    return
+
+                images = session.exec(
+                    sqlmodel.select(ImageRecord, UserProfile)
+                    .join(UserProfile, ImageRecord.owner_email == UserProfile.email)
+                    .where(ImageRecord.id.in_(int_ids))
+                    .where(ImageRecord.is_public == True)
+                ).all()
+                
+                # Re-order based on Pinecone score (match_ids order)
+                id_map = {str(img.id): (img, user) for img, user in images}
+                results = []
+                for mid in match_ids:
+                    if mid in id_map:
+                        img, user = id_map[mid]
+                        results.append(SemanticImageResult(
+                            id=img.id,
+                            filename=img.filename,
+                            full_url=f"/uploaded_files/{img.filename}",
+                            caption=img.caption or "",
+                            owner_username=user.username,
+                        ))
+                
+                self.image_search_results = results
+                self.search_done = True
+        except Exception as e:
+            print(f"AI Search Error: {e}")
+            self.image_search_results = []
             self.search_done = True
         finally:
             self.search_loading = False
@@ -1160,7 +1253,7 @@ class ProfileState(rx.State):
     def copy_image_link(self):
         """Direct link to the currently viewed image in the lightbox."""
         if not self.viewed_lightbox_filename: return
-        url = rx.get_upload_url(self.viewed_lightbox_filename)
+        url = "/uploaded_files/" + self.viewed_lightbox_filename
         # Using a full site URL would be better but let's stick to the upload URL for now
         # especially since they don't have a permalink page yet.
         # Alternatively, we could link to the user's profile with an anchor or param.
