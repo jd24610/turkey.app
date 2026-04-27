@@ -15,4 +15,4 @@ RUN uv sync --frozen --no-install-project
 COPY . .
 RUN uv sync --frozen
 EXPOSE 8000
-CMD ["reflex", "run", "--env", "prod", "--backend-port", "8000"]
+CMD ["reflex", "run", "--env", "prod", "--backend-only", "--backend-port", "8000"]
