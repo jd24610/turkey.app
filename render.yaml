@@ -1,0 +1,29 @@
+services:
+  # ─── Service 1: The App Backend (Reflex) ───
+  - type: web
+    name: turkey-app-backend
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: Dockerfile
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: API_URL
+        fromContext: git
+      - key: BRAIN_URL
+        fromService:
+          type: web
+          name: turkey-app-brain
+          property: host
+
+  # ─── Service 2: The AI Brain (FastAPI) ───
+  - type: web
+    name: turkey-app-brain
+    runtime: docker
+    dockerContext: .
+    dockerfilePath: Dockerfile.brain
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8001
