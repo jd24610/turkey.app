@@ -54,6 +54,7 @@ class State(rx.State):
             yield UploadState.set_user_email(email)
             yield UploadState.set_user_name(name)
             yield ProfileState.init_profile(email, name)
+            yield rx.redirect("/library")
             
         except Exception as e:
             print(f"Error decoding token: {e}")
