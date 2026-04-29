@@ -231,7 +231,7 @@ app = rx.App(
     ),
 )
 
-# Serve uploaded files from the backend (only if fastapi is present)
+# ─── Backend Image Server & Diagnostics ───────────────────────────────────────
 try:
     from fastapi.staticfiles import StaticFiles
     import os
@@ -259,6 +259,9 @@ try:
         
 except Exception as e:
     print(f"[turkey] Static mount error: {e}")
+
+
+
 
 app.add_page(login_page, route="/", on_load=State.on_app_load, title="turkey.app — Your Media Library")
 app.add_page(library_page, route="/library", on_load=[State.on_app_load, UploadState.on_load], title="My Library • turkey.app")

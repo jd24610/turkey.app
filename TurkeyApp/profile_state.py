@@ -1036,7 +1036,7 @@ class ProfileState(rx.State):
             self.viewed_images = [
                 {
                     "filename": img.filename,
-                    "url": self.backend_url + "/uploaded_files/" + img.filename,
+                    "url": (self.backend_url + "/uploaded_files/" + img.filename).replace(" ", "%20"),
                     "original_filename": img.original_filename,
                     "folder_name": img.folder_name,
                     "caption": img.caption,
