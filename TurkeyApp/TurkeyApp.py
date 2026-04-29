@@ -235,12 +235,20 @@ app = rx.App(
 try:
     from fastapi.staticfiles import StaticFiles
     import os
-    upload_dir = os.path.join("assets", "uploaded_files")
+    # Force absolute path for Render
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    upload_dir = os.path.join(base_dir, "assets", "uploaded_files")
     if not os.path.exists(upload_dir):
         os.makedirs(upload_dir, exist_ok=True)
+    
     app.api.mount("/uploaded_files", StaticFiles(directory=upload_dir), name="uploaded_files")
-except (ImportError, AttributeError):
-    pass
+    
+    @app.api.get("/ping")
+    def ping():
+        return {"status": "ok", "upload_dir": upload_dir}
+        
+except Exception as e:
+    print(f"[turkey] Static mount error: {e}")
 
 app.add_page(login_page, route="/", on_load=State.on_app_load, title="turkey.app — Your Media Library")
 app.add_page(library_page, route="/library", on_load=[State.on_app_load, UploadState.on_load], title="My Library • turkey.app")
