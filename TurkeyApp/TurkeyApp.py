@@ -230,6 +230,15 @@ app = rx.App(
         radius="medium",
     ),
 )
+
+# Serve uploaded files from the backend
+from fastapi.staticfiles import StaticFiles
+import os
+upload_dir = os.path.join("assets", "uploaded_files")
+if not os.path.exists(upload_dir):
+    os.makedirs(upload_dir, exist_ok=True)
+app.api.mount("/uploaded_files", StaticFiles(directory=upload_dir), name="uploaded_files")
+
 app.add_page(login_page, route="/", on_load=State.on_app_load, title="turkey.app — Your Media Library")
 app.add_page(library_page, route="/library", on_load=[State.on_app_load, UploadState.on_load], title="My Library • turkey.app")
 app.add_page(public_profile_page, route="/u/[username]", on_load=ProfileState.load_public_profile, title="Profile • turkey.app")

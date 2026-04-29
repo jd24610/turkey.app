@@ -49,6 +49,12 @@ class ImageData(BaseModel):
     caption: Optional[str] = ""  # optional public caption
     exif_info: Optional[str] = None  # JSON-stringified EXIF metadata
 
+    @property
+    def img_url(self) -> str:
+        """Construct the full URL for the image."""
+        backend = os.getenv("API_URL", "http://localhost:8000")
+        return f"{backend}/uploaded_files/{self.filename}"
+
 
 class UploadState(rx.State):
     """State for the Import/Export page."""
