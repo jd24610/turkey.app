@@ -102,6 +102,7 @@ class UploadState(rx.State):
 
     # ---- Image preview (lightbox) ----
     preview_filename: str = ""
+    preview_url: str = ""       # Full CDN or backend URL for the lightbox
     show_preview: bool = False
     preview_index: int = -1
     lightbox_editing_caption: bool = False
@@ -420,26 +421,41 @@ class UploadState(rx.State):
         """Open the lightbox preview for a given image filename."""
         self.preview_filename = filename
         self.show_preview = True
+        # Find the full CDN URL from the loaded images list
+        for img in self.filtered_images:
+            if img.filename == filename:
+                self.preview_url = img.full_url
+                break
+        else:
+            # Fallback: construct from env
+            import os, urllib.parse
+            backend = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
+            self.preview_url = f"{backend}/uploaded_files/{urllib.parse.quote(filename, safe='')}"
         return UploadState.run_ai_analysis
 
     def close_preview(self):
         """Close the lightbox preview."""
         self.show_preview = False
         self.preview_filename = ""
+        self.preview_url = ""
         self.preview_index = -1
 
     def prev_image(self):
         """Navigate to the previous image in lightbox."""
         if self.preview_index > 0:
             self.preview_index -= 1
-            self.preview_filename = self.filtered_images[self.preview_index].filename
+            img = self.filtered_images[self.preview_index]
+            self.preview_filename = img.filename
+            self.preview_url = img.full_url
             return UploadState.run_ai_analysis
 
     def next_image(self):
         """Navigate to the next image in lightbox."""
         if self.preview_index < len(self.filtered_images) - 1:
             self.preview_index += 1
-            self.preview_filename = self.filtered_images[self.preview_index].filename
+            img = self.filtered_images[self.preview_index]
+            self.preview_filename = img.filename
+            self.preview_url = img.full_url
             return UploadState.run_ai_analysis
 
     def toggle_image_public(self, image_id: int):

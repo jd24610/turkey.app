@@ -273,7 +273,7 @@ def lightbox_modal() -> rx.Component:
                 rx.vstack(
                     # Image
                     rx.image(
-                        src=(State.backend_url + "/uploaded_files/" + UploadState.preview_filename).replace(" ", "%20"),
+                        src=UploadState.preview_url,
                         max_width="70vw",
                         max_height="72vh",
                         object_fit="contain",
