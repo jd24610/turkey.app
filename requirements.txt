@@ -1,1 +1,7 @@
-reflex==0.6.4
+reflex==0.8.26
+sqlmodel>=0.0.22
+pillow>=12.1.1
+requests
+pinecone
+python-dotenv
+reflex-hosting-cli==0.1.63
