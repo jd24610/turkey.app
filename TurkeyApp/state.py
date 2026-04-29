@@ -35,29 +35,45 @@ class State(rx.State):
     def on_success(self, id_token: dict):
         self.id_token_json = str(id_token)
         cred = id_token.get("credential", "")
+
+        # ── Step 1: Decode JWT payload ─────────────────────────────────────
+        email = ""
+        name = ""
         try:
             import base64, json as _json
-            # header, payload, signature
             parts = cred.split(".")
-            payload = parts[1]
-            # fix padding
-            payload += "=" * (4 - len(payload) % 4)
-            data = _json.loads(base64.b64decode(payload).decode("utf-8"))
-            email = data.get("email", "")
-            name = data.get("name", "")
-            self.user_email = email
-            self.user_name = name
-            # persist to cookie
-            self.session_email = email
-            self.session_name = name
-            
-            yield UploadState.set_user_email(email)
-            yield UploadState.set_user_name(name)
-            yield ProfileState.init_profile(email, name)
-            yield rx.redirect("/library")
-            
+            if len(parts) >= 2:
+                payload = parts[1]
+                payload += "=" * (4 - len(payload) % 4)
+                data = _json.loads(base64.b64decode(payload).decode("utf-8"))
+                email = data.get("email", "")
+                name = data.get("name", "")
         except Exception as e:
-            print(f"Error decoding token: {e}")
+            print(f"[turkey] JWT decode error: {e}")
+
+        # ── Step 2: If we couldn't decode, bail out visibly ────────────────
+        if not email:
+            print("[turkey] on_success: no email found in token — aborting login")
+            return
+
+        # ── Step 3: Persist session state ──────────────────────────────────
+        self.user_email = email
+        self.user_name = name
+        self.session_email = email
+        self.session_name = name
+
+        # ── Step 4: Propagate to sub-states ────────────────────────────────
+        yield UploadState.set_user_email(email)
+        yield UploadState.set_user_name(name)
+
+        # ── Step 5: Profile init (non-blocking — redirect happens regardless)
+        try:
+            yield ProfileState.init_profile(email, name)
+        except Exception as e:
+            print(f"[turkey] ProfileState.init_profile error: {e}")
+
+        # ── Step 6: Always redirect to the library ─────────────────────────
+        yield rx.redirect("/library")
 
     def login_as_guest(self):
         """Set a read-only guest session and go to the feed."""

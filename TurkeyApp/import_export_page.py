@@ -14,7 +14,7 @@ def toast_notification() -> rx.Component:
         UploadState.toast_visible,
         rx.box(
             rx.hstack(
-                # Coloured icon
+
                 rx.cond(
                     UploadState.upload_status == "success",
                     rx.icon("circle-check", color="#22c55e", size=22, flex_shrink="0"),

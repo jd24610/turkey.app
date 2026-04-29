@@ -1139,7 +1139,7 @@ class ProfileState(rx.State):
         if 0 <= index < len(self.viewed_images):
             img = self.viewed_images[index]
             self.viewed_lightbox_filename = img.get("filename", "")
-            self.viewed_lightbox_caption = img.get("caption", "")
+            self.viewed_lightbox_caption = img.get("caption", "") or ""
             self.viewed_lightbox_image_id = img.get("image_id", 0)
             self.viewed_lightbox_index = index
             self.show_viewed_lightbox = True
@@ -1155,7 +1155,7 @@ class ProfileState(rx.State):
         if idx >= 0:
             img = self.viewed_images[idx]
             self.viewed_lightbox_filename = img.get("filename", "")
-            self.viewed_lightbox_caption = img.get("caption", "")
+            self.viewed_lightbox_caption = img.get("caption", "") or ""
             self.viewed_lightbox_image_id = img.get("image_id", 0)
             self.viewed_lightbox_index = idx
             self._load_lightbox_data(self.viewed_lightbox_image_id)
@@ -1165,7 +1165,7 @@ class ProfileState(rx.State):
         if idx < len(self.viewed_images):
             img = self.viewed_images[idx]
             self.viewed_lightbox_filename = img.get("filename", "")
-            self.viewed_lightbox_caption = img.get("caption", "")
+            self.viewed_lightbox_caption = img.get("caption", "") or ""
             self.viewed_lightbox_image_id = img.get("image_id", 0)
             self.viewed_lightbox_index = idx
             self._load_lightbox_data(self.viewed_lightbox_image_id)

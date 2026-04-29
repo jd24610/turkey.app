@@ -47,6 +47,7 @@ class ImageData(BaseModel):
     tag_ids: list[int] = []
     is_public: bool = False      # shared on public profile & feed
     caption: Optional[str] = ""  # optional public caption
+    exif_info: Optional[str] = None  # JSON-stringified EXIF metadata
 
 
 class UploadState(rx.State):
@@ -332,7 +333,7 @@ class UploadState(rx.State):
     def lightbox_caption(self) -> str:
         imgs = self.filtered_images
         if 0 <= self.preview_index < len(imgs):
-            return imgs[self.preview_index].caption
+            return imgs[self.preview_index].caption or ""
         return ""
 
     # ── Lifecycle ─────────────────────────────
@@ -750,6 +751,7 @@ class UploadState(rx.State):
             tag_ids=tag_ids or [],
             is_public=r.is_public,
             caption=r.caption,
+            exif_info=r.exif_info,
         )
 
     def _refresh_images(self):
