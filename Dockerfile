@@ -23,10 +23,10 @@ RUN uv sync --frozen --no-install-project
 COPY . .
 RUN uv sync --frozen
 
-# Build the Reflex frontend (generates .web/out/)
-RUN uv run reflex export --frontend-only --no-zip 2>&1 || true
+# Build the Reflex frontend
+RUN uv run reflex export --frontend-only --no-zip
 
 EXPOSE 8000
 
-# Run full app (backend serves the pre-built frontend)
-CMD ["uv", "run", "reflex", "run", "--env", "prod", "--backend-only", "--backend-port", "8000"]
+# Run full app (Both Frontend and Backend)
+CMD ["uv", "run", "reflex", "run", "--env", "prod", "--backend-port", "8000"]
