@@ -236,3 +236,19 @@ app.add_page(public_profile_page, route="/u/[username]", on_load=ProfileState.lo
 app.add_page(search_page, route="/search", on_load=[State.on_app_load, ProfileState.run_search], title="Discover People • turkey.app")
 app.add_page(feed_page, route="/feed", on_load=[State.on_app_load, FeedState.load_posts], title="Feed • turkey.app")
 app.add_page(notifications_page, route="/notifications", on_load=[State.on_app_load, ProfileState.load_notifications], title="Notifications • turkey.app")
+
+
+# ─── Database Initialization ──────────────────────────────────────────────────
+
+def init_db():
+    import sqlalchemy
+    from TurkeyApp import models
+    try:
+        engine = sqlalchemy.create_engine(config.db_url)
+        models.rx.Model.metadata.create_all(engine)
+        print("[turkey] Database tables initialized successfully.")
+    except Exception as e:
+        print(f"[turkey] Database initialization failed: {e}")
+
+# Run init on startup
+init_db()
