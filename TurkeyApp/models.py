@@ -45,6 +45,7 @@ class ImageRecord(rx.Model, table=True):
     is_public: bool = Field(default=False)
     caption: Optional[str] = Field(default=None)
     exif_info: Optional[str] = Field(default=None) # JSON-stringified metadata
+    cdn_url: Optional[str] = Field(default=None)   # Permanent Cloudinary/CDN URL
 
 
 class Tag(rx.Model, table=True):

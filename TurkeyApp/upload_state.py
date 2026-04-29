@@ -802,9 +802,13 @@ class UploadState(rx.State):
             caption=r.caption,
             exif_info=r.exif_info,
             full_url=(
-                os.getenv("API_URL", "http://localhost:8000").rstrip("/")
-                + "/uploaded_files/"
-                + (r.filename or "")
+                r.cdn_url  # Use permanent CDN URL if available
+                if r.cdn_url
+                else (
+                    os.getenv("API_URL", "http://localhost:8000").rstrip("/")
+                    + "/uploaded_files/"
+                    + __import__("urllib.parse", fromlist=["quote"]).quote(r.filename or "", safe="")
+                )
             ),
         )
 
@@ -1169,14 +1173,48 @@ class UploadState(rx.State):
         return buf.getvalue(), "image/jpeg"
 
     async def _save_image(self, original_name: str, data: bytes, mime: str, original_size: int, was_compressed: bool):
+        import urllib.parse
         ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         safe_name = f"{ts}_{original_name.replace(' ', '_')}"
         filepath = os.path.join(UPLOAD_DIR, safe_name)
         with open(filepath, "wb") as f:
             f.write(data)
+
+        # ── Try Cloudinary upload for persistent storage ──────────────────────
+        cdn_url = ""
+        cloudinary_url = os.getenv("CLOUDINARY_URL", "")
+        if cloudinary_url:
+            try:
+                import base64, requests as _req
+                # Parse cloudinary://api_key:api_secret@cloud_name
+                from urllib.parse import urlparse
+                parsed = urlparse(cloudinary_url)
+                cloud_name = parsed.hostname
+                api_key = parsed.username
+                api_secret = parsed.password
+                b64 = base64.b64encode(data).decode("utf-8")
+                data_uri = f"data:{mime};base64,{b64}"
+                resp = _req.post(
+                    f"https://api.cloudinary.com/v1_1/{cloud_name}/image/upload",
+                    data={"file": data_uri, "upload_preset": "turkey_app", "public_id": safe_name},
+                    auth=(api_key, api_secret),
+                    timeout=30,
+                )
+                result = resp.json()
+                cdn_url = result.get("secure_url", "")
+                if cdn_url:
+                    print(f"[turkey] Cloudinary upload OK: {cdn_url}")
+            except Exception as cdn_err:
+                print(f"[turkey] Cloudinary upload warning: {cdn_err}")
+
         import json
         exif_json = self._extract_exif(data)
         
+        # Build the fallback URL using local backend
+        backend = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
+        local_url = f"{backend}/uploaded_files/{urllib.parse.quote(safe_name, safe='')}"
+        final_url = cdn_url if cdn_url else local_url
+
         with rx.session() as session:
             new_image = ImageRecord(
                 filename=safe_name,
@@ -1188,6 +1226,7 @@ class UploadState(rx.State):
                 was_compressed=was_compressed,
                 created_at=datetime.datetime.now().isoformat(),
                 exif_info=exif_json,
+                cdn_url=final_url,  # Store the permanent URL
             )
             session.add(new_image)
             session.commit()
@@ -1196,22 +1235,17 @@ class UploadState(rx.State):
 
         # ─── B. Trigger the AI Pipeline (Capstone Logic) ───────────────────────────
         try:
-            # 1. Get Embeddings from Hugging Face
             vector = await get_image_embeddings(data)
-            
-            # 2. Upsert to Pinecone if vector is valid
             if vector and isinstance(vector, list):
                 metadata = {
                     "filename": original_name,
                     "folder": self.selected_folder,
-                    "location": "TurkeyApp_Library", # Custom tag for your Capstone
+                    "location": "TurkeyApp_Library",
                     "upload_date": datetime.datetime.now().isoformat()
                 }
                 await upsert_to_pinecone(image_id, vector, metadata)
-                print(f"AI: Successfully indexed image {image_id}")
         except Exception as ai_err:
             print(f"AI Pipeline Warning: {ai_err}")
-            # We don't block the upload if AI fails, as per your "Consistency" rule.
 
     def _extract_exif(self, data: bytes) -> str:
         """Helper to extract EXIF metadata from image bytes."""
