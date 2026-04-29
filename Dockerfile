@@ -23,5 +23,5 @@ RUN uv sync --frozen
 
 EXPOSE 8000
 
-# Run BACKEND ONLY to save RAM
-CMD ["uv", "run", "reflex", "run", "--env", "prod", "--backend-only", "--backend-port", "8000"]
+# Initialize the database AND run the backend
+CMD ["sh", "-c", "uv run reflex db init && uv run reflex run --env prod --backend-only --backend-port 8000"]
