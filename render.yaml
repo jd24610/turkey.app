@@ -1,5 +1,5 @@
 services:
-  # ── Backend (Python/Reflex) ────────────────────────────────────────────────
+  # ── 1. The Backend (API) ──────────────────────────────────────────────────
   - type: web
     name: turkey-app-backend
     runtime: docker
@@ -15,3 +15,13 @@ services:
         sync: false
       - key: PINECONE_INDEX
         value: turkey-app
+
+  # ── 2. The Frontend (Static UI) ───────────────────────────────────────────
+  - type: static
+    name: turkey-app-frontend
+    buildPlan: free
+    publishDir: .web/_static
+    buildCommand: "uv sync && uv run reflex export --frontend-only --no-zip"
+    envVars:
+      - key: API_URL
+        sync: false
