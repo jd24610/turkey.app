@@ -3,7 +3,6 @@ import requests
 import asyncio
 from dotenv import load_dotenv
 from pinecone import Pinecone
-from pexels_api import API as PexelsAPI
 
 load_dotenv()
 
@@ -105,16 +104,23 @@ async def analyze_image_labels(image_path: str) -> list[str]:
 async def search_pexels_photos(query: str, per_page: int = 15) -> list[dict]:
     """Searches Pexels for high-quality photos matching the query."""
     try:
-        api = PexelsAPI(PEXELS_API_KEY)
-        api.search(query, page=1, results_per_page=per_page)
-        photos = api.get_entries()
+        headers = {"Authorization": PEXELS_API_KEY}
+        params = {"query": query, "per_page": per_page, "page": 1}
+        response = requests.get(
+            "https://api.pexels.com/v1/search",
+            headers=headers,
+            params=params,
+            timeout=10
+        )
+        data = response.json()
+        photos = data.get("photos", [])
         return [
             {
-                "url": photo.large2x,
-                "thumbnail": photo.medium,
-                "photographer": photo.photographer,
-                "photographer_url": photo.photographer_url,
-                "alt": f"Photo by {photo.photographer} via Pexels"
+                "url": photo["src"]["large2x"],
+                "thumbnail": photo["src"]["medium"],
+                "photographer": photo["photographer"],
+                "photographer_url": photo["photographer_url"],
+                "alt": photo.get("alt", f"Photo by {photo['photographer']} via Pexels")
             }
             for photo in photos
         ]
