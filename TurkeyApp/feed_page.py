@@ -147,10 +147,18 @@ class FeedState(rx.State):
             viewer_liked = set(liked_rows)
 
         posts = []
+        import os, urllib.parse as _up
+        backend = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
         for img in images:
             p = profile_map.get(img.owner_email)
             if not p:
                 continue
+            # Use Cloudinary CDN if available, else full backend URL
+            if img.cdn_url:
+                img_url = img.cdn_url
+            else:
+                img_url = f"{backend}/uploaded_files/{_up.quote(img.filename or '', safe='')}"
+            avatar_url = f"{backend}/uploaded_files/avatars/{p.avatar_filename}" if p.avatar_filename else ""
             posts.append(FeedPost(
                 image_id=img.id or 0,
                 filename=img.filename,
@@ -159,11 +167,11 @@ class FeedState(rx.State):
                 owner_email=img.owner_email,
                 owner_username=p.username,
                 owner_display_name=p.display_name or p.username,
-                owner_avatar_url=("/uploaded_files/avatars/" + p.avatar_filename) if p.avatar_filename else "",
-                image_url="/uploaded_files/" + img.filename,
+                owner_avatar_url=avatar_url,
+                image_url=img_url,
                 like_count=like_counts.get(img.id or 0, 0),
                 viewer_has_liked=(img.id in viewer_liked),
-                tags=[] # will be populated in bulk if possible, or later
+                tags=[]
             ))
         
         # Load tags for all posts in bulk
