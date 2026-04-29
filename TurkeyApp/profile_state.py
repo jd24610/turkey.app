@@ -684,8 +684,9 @@ class ProfileState(rx.State):
         finally:
             self.search_loading = False
     async def run_image_search(self):
-        """Semantic search for images via Pinecone/CLIP AI."""
-        q = self.search_query.strip()
+        """Search public images by caption, filename, or tag — no AI keys needed."""
+        import os
+        q = self.search_query.strip().lower()
         if not q:
             self.image_search_results = []
             self.search_done = False
@@ -694,56 +695,41 @@ class ProfileState(rx.State):
         self.search_loading = True
         self.image_search_results = []
         try:
-            from TurkeyApp.ai_utils import get_text_embeddings, query_pinecone
-            # 1. Get Text Vector
-            vector = await get_text_embeddings(q)
-            if not vector or not isinstance(vector, list):
-                self.search_done = True
-                return
-
-            # 2. Search Pinecone
-            match_ids = await query_pinecone(vector)
-            if not match_ids:
-                self.search_done = True
-                return
-
-            # 3. Retrieve DB records for matches
+            backend = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
             with rx.session() as session:
-                # Resolve int IDs for SQLite
-                int_ids = []
-                for mid in match_ids:
-                    try: int_ids.append(int(mid))
-                    except: pass
-                
-                if not int_ids:
-                    self.search_done = True
-                    return
-
                 images = session.exec(
                     sqlmodel.select(ImageRecord, UserProfile)
                     .join(UserProfile, ImageRecord.owner_email == UserProfile.email)
-                    .where(ImageRecord.id.in_(int_ids))
                     .where(ImageRecord.is_public == True)
+                    .where(UserProfile.onboarding_complete == True)
+                    .order_by(ImageRecord.created_at.desc())
+                    .limit(200)
                 ).all()
-                
-                # Re-order based on Pinecone score (match_ids order)
-                id_map = {str(img.id): (img, user) for img, user in images}
+
                 results = []
-                for mid in match_ids:
-                    if mid in id_map:
-                        img, user = id_map[mid]
+                for img, user in images:
+                    # Match against caption, filename, or username
+                    searchable = " ".join([
+                        (img.caption or ""),
+                        (img.original_filename or ""),
+                        (img.filename or ""),
+                        (user.username or ""),
+                        (user.display_name or ""),
+                    ]).lower()
+
+                    if q in searchable:
                         results.append(SemanticImageResult(
                             id=img.id,
                             filename=img.filename,
-                            full_url=f"/uploaded_files/{img.filename}",
-                            caption=img.caption or "",
+                            full_url=f"{backend}/uploaded_files/{img.filename}",
+                            caption=img.caption or img.original_filename or "",
                             owner_username=user.username,
                         ))
-                
-                self.image_search_results = results
-                self.search_done = True
+
+            self.image_search_results = results[:48]  # Cap at 48
+            self.search_done = True
         except Exception as e:
-            print(f"AI Search Error: {e}")
+            print(f"Image Search Error: {e}")
             self.image_search_results = []
             self.search_done = True
         finally:
