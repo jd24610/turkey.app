@@ -17,11 +17,11 @@ services:
         value: turkey-app
 
   # ── 2. The Frontend (Static UI) ───────────────────────────────────────────
-  - type: static
+  - type: web
     name: turkey-app-frontend
-    buildPlan: free
-    publishDir: .web/_static
+    env: static
     buildCommand: "uv sync && uv run reflex export --frontend-only --no-zip"
+    staticPublishDir: .web/_static
     envVars:
       - key: API_URL
         sync: false
