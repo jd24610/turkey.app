@@ -1,7 +1,8 @@
 reflex==0.8.26
 sqlmodel>=0.0.22
-pillow>=12.1.1
+pillow>=10.2.0
 requests
-pinecone
+pinecone-client
 python-dotenv
-reflex-hosting-cli==0.1.63
+fastapi
+uvicorn
