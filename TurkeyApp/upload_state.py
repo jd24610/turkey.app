@@ -1180,32 +1180,46 @@ class UploadState(rx.State):
         with open(filepath, "wb") as f:
             f.write(data)
 
-        # ── Try Cloudinary upload for persistent storage ──────────────────────
+        # ── Cloudinary upload for persistent storage ──────────────────────────
         cdn_url = ""
         cloudinary_url = os.getenv("CLOUDINARY_URL", "")
         if cloudinary_url:
             try:
-                import base64, requests as _req
-                # Parse cloudinary://api_key:api_secret@cloud_name
+                import base64, hashlib, time as _time, requests as _req
                 from urllib.parse import urlparse
                 parsed = urlparse(cloudinary_url)
                 cloud_name = parsed.hostname
-                api_key = parsed.username
+                api_key    = parsed.username
                 api_secret = parsed.password
-                b64 = base64.b64encode(data).decode("utf-8")
+
+                # Build a signed upload request (no preset needed)
+                timestamp  = int(_time.time())
+                public_id  = safe_name.replace(".", "_")
+                sig_str    = f"public_id={public_id}&timestamp={timestamp}{api_secret}"
+                signature  = hashlib.sha1(sig_str.encode("utf-8")).hexdigest()
+
+                b64      = base64.b64encode(data).decode("utf-8")
                 data_uri = f"data:{mime};base64,{b64}"
-                resp = _req.post(
+
+                resp   = _req.post(
                     f"https://api.cloudinary.com/v1_1/{cloud_name}/image/upload",
-                    data={"file": data_uri, "upload_preset": "turkey_app", "public_id": safe_name},
-                    auth=(api_key, api_secret),
-                    timeout=30,
+                    data={
+                        "file":      data_uri,
+                        "public_id": public_id,
+                        "timestamp": timestamp,
+                        "api_key":   api_key,
+                        "signature": signature,
+                    },
+                    timeout=60,
                 )
-                result = resp.json()
+                result  = resp.json()
                 cdn_url = result.get("secure_url", "")
                 if cdn_url:
-                    print(f"[turkey] Cloudinary upload OK: {cdn_url}")
+                    print(f"[turkey] Cloudinary OK: {cdn_url}")
+                else:
+                    print(f"[turkey] Cloudinary error: {result}")
             except Exception as cdn_err:
-                print(f"[turkey] Cloudinary upload warning: {cdn_err}")
+                print(f"[turkey] Cloudinary warning: {cdn_err}")
 
         import json
         exif_json = self._extract_exif(data)
