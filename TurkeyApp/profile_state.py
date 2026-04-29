@@ -378,35 +378,52 @@ class ProfileState(rx.State):
     def init_profile(self, email: str, google_name: str = ""):
         """Called right after Google OAuth success. Loads or queues onboarding."""
         self.own_email = email
+        profile = None
         with rx.session() as session:
             profile = session.exec(
                 sqlmodel.select(UserProfile).where(UserProfile.email == email)
             ).first()
-
-        if profile and profile.onboarding_complete:
-            self._load_from_profile(profile)
-            self.onboarding_complete = True
-            self.show_onboarding = False
-        else:
-            # New user — prefill display name from Google
-            self.display_name_input = google_name
-            self.onboarding_complete = False
-            self.show_onboarding = True
-            self.onboarding_step = 1
+            if profile and profile.onboarding_complete:
+                # Load everything inside the session so no detached-instance errors
+                self._load_from_profile(profile)
+                self.onboarding_complete = True
+                self.show_onboarding = False
+            elif profile:
+                # Partial onboarding — prefill what we have
+                self.display_name_input = profile.display_name or google_name
+                self.username_input = profile.username or ""
+                self.onboarding_complete = False
+                self.show_onboarding = True
+                self.onboarding_step = 1
+            else:
+                # Brand new user
+                self.display_name_input = google_name
+                self.onboarding_complete = False
+                self.show_onboarding = True
+                self.onboarding_step = 1
 
         self.profile_loaded = True
 
     def _load_from_profile(self, profile: UserProfile):
-        self.own_username = profile.username
-        self.own_display_name = profile.display_name
-        self.own_bio = profile.bio
-        self.own_dob = profile.date_of_birth
-        self.own_location = profile.location
-        self.own_website = profile.website
+        self.own_username = profile.username or ""
+        self.own_display_name = profile.display_name or ""
+        self.own_bio = profile.bio or ""
+        self.own_dob = profile.date_of_birth or ""
+        self.own_location = profile.location or ""
+        self.own_website = profile.website or ""
         self.own_is_public = profile.is_public
-        self.own_avatar = profile.avatar_filename
-        self.own_banner = profile.banner_filename
+        self.own_avatar = profile.avatar_filename or ""
+        self.own_banner = profile.banner_filename or ""
         self.own_member_since = profile.created_at[:7] if profile.created_at else ""
+        # Compute initials from display name
+        name = profile.display_name or profile.username or ""
+        parts = name.split()
+        if len(parts) >= 2:
+            self.own_initials = (parts[0][0] + parts[-1][0]).upper()
+        elif name:
+            self.own_initials = name[:2].upper()
+        else:
+            self.own_initials = "??"
 
     # ── Edit profile ──────────────────────────
 

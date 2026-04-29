@@ -41,6 +41,7 @@ class State(rx.State):
             yield UploadState.set_user_email(self.session_email)
             yield UploadState.set_user_name(self.session_name)
             yield ProfileState.init_profile(self.session_email, self.session_name)
+            yield UploadState.on_load  # Restore image library from DB
 
     def on_success(self, id_token: dict):
         self.id_token_json = str(id_token)
