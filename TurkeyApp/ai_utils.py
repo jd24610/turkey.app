@@ -3,7 +3,6 @@ import requests
 import asyncio
 from dotenv import load_dotenv
 from pinecone import Pinecone
-from google.cloud import vision
 from pexels_api import API as PexelsAPI
 
 load_dotenv()
