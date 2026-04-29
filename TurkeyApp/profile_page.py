@@ -4,6 +4,7 @@ import reflex as rx
 from TurkeyApp.profile_state import ProfileState
 from TurkeyApp.upload_state import UploadState
 from TurkeyApp.navbar import navbar
+from TurkeyApp.edit_profile_modal import edit_profile_modal
 
 
 # ─── Components ─────────────────────────────────────────────────────────────
@@ -91,7 +92,17 @@ def profile_header() -> rx.Component:
                 rx.cond(
                     # If viewing own profile, show nothing or edit
                     ProfileState.viewed_email == ProfileState.own_email,
-                    rx.box(),
+                    rx.button(
+                        rx.icon("pencil", size=18),
+                        "Edit Profile",
+                        on_click=ProfileState.open_edit_modal,
+                        size="3",
+                        background="linear-gradient(135deg, #7c3aed, #a855f7)",
+                        color="white",
+                        border_radius="12px",
+                        cursor="pointer",
+                        _hover={"opacity": "0.9"},
+                    ),
                     rx.cond(
                         ProfileState.viewer_is_following,
                         rx.button(
@@ -419,6 +430,7 @@ def profile_not_found() -> rx.Component:
 
 def public_profile_page() -> rx.Component:
     return rx.box(
+        edit_profile_modal(),
         profile_toast(),
         profile_lightbox(),
         navbar(active_page="profile"),
