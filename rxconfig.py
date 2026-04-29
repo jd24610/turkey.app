@@ -4,8 +4,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Use the Render backend URL if we are in production, otherwise localhost
+api_url = os.getenv("API_URL", "http://localhost:8000")
+
 config = rx.Config(
     app_name="TurkeyApp",
+    api_url=api_url,
     cors_allowed_origins=[
         "http://localhost:3000",
         "https://turkey-app-frontend.onrender.com",
