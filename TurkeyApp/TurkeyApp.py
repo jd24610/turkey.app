@@ -243,9 +243,19 @@ try:
     
     app.api.mount("/uploaded_files", StaticFiles(directory=upload_dir), name="uploaded_files")
     
-    @app.api.get("/ping")
-    def ping():
-        return {"status": "ok", "upload_dir": upload_dir}
+    @app.api.get("/turkey-status")
+    def turkey_status():
+        return {
+            "status": "online",
+            "upload_dir": upload_dir,
+            "exists": os.path.exists(upload_dir),
+            "files": os.listdir(upload_dir) if os.path.exists(upload_dir) else []
+        }
+    
+    print("\n" + "="*50)
+    print(f"  [TURKEY] Backend Image Server Active")
+    print(f"  [TURKEY] Upload Directory: {upload_dir}")
+    print("="*50 + "\n")
         
 except Exception as e:
     print(f"[turkey] Static mount error: {e}")
