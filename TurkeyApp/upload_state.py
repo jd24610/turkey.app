@@ -53,6 +53,7 @@ class ImageData(BaseModel):
     is_public: bool = False      # shared on public profile & feed
     caption: Optional[str] = ""  # optional public caption
     exif_info: Optional[str] = None  # JSON-stringified EXIF metadata
+    full_url: str = ""  # Absolute URL to the image on the backend
 
     @property
     def img_url(self) -> str:
@@ -800,6 +801,11 @@ class UploadState(rx.State):
             is_public=r.is_public,
             caption=r.caption,
             exif_info=r.exif_info,
+            full_url=(
+                os.getenv("API_URL", "http://localhost:8000").rstrip("/")
+                + "/uploaded_files/"
+                + (r.filename or "")
+            ),
         )
 
     def _refresh_images(self):
