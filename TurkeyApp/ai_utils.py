@@ -3,6 +3,8 @@ import requests
 import asyncio
 from dotenv import load_dotenv
 from pinecone import Pinecone
+from google.cloud import vision
+from pexels_api import API as PexelsAPI
 
 load_dotenv()
 
@@ -63,3 +65,60 @@ async def upsert_to_pinecone(image_id: str, vector: list):
         index.upsert(vectors=[(image_id, vector)])
     except Exception as e:
         print(f"Pinecone Upsert Error: {e}")
+
+
+# Pexels Config
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "b2bh331NfhOQEVuBH26J0UBRQPRvceShOTAEkKCevBIqitGPPU31qmmS")
+
+# Google Vision Config
+GOOGLE_VISION_API_KEY = os.getenv("GOOGLE_VISION_API_KEY", "AIzaSyCFbxFd8ZWZmkQrmv0cCFxGSf-WOgLTdHw")
+VISION_URL = f"https://vision.googleapis.com/v1/images:annotate?key={GOOGLE_VISION_API_KEY}"
+
+async def analyze_image_labels(image_path: str) -> list[str]:
+    """Uses Google Cloud Vision REST API to extract labels from an image."""
+    try:
+        import base64
+        with open(image_path, "rb") as image_file:
+            content = base64.b64encode(image_file.read()).decode("utf-8")
+        
+        payload = {
+            "requests": [
+                {
+                    "image": {"content": content},
+                    "features": [{"type": "LABEL_DETECTION", "maxResults": 10}]
+                }
+            ]
+        }
+        
+        response = requests.post(VISION_URL, json=payload)
+        res = response.json()
+        
+        # Extract labels from the response
+        if "responses" in res and res["responses"]:
+            annotations = res["responses"][0].get("labelAnnotations", [])
+            return [label["description"] for label in annotations[:8]]
+            
+        return []
+    except Exception as e:
+        print(f"Vision API REST Error: {e}")
+        return []
+
+async def search_pexels_photos(query: str, per_page: int = 15) -> list[dict]:
+    """Searches Pexels for high-quality photos matching the query."""
+    try:
+        api = PexelsAPI(PEXELS_API_KEY)
+        api.search(query, page=1, results_per_page=per_page)
+        photos = api.get_entries()
+        return [
+            {
+                "url": photo.large2x,
+                "thumbnail": photo.medium,
+                "photographer": photo.photographer,
+                "photographer_url": photo.photographer_url,
+                "alt": f"Photo by {photo.photographer} via Pexels"
+            }
+            for photo in photos
+        ]
+    except Exception as e:
+        print(f"Pexels API Error: {e}")
+        return []

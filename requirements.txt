@@ -6,3 +6,5 @@ pinecone-client
 python-dotenv
 fastapi
 uvicorn
+pexels-api
+google-cloud-vision

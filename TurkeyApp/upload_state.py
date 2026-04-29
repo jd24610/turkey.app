@@ -11,7 +11,12 @@ from pydantic import BaseModel
 from TurkeyApp.models import ImageRecord, Folder, Tag, ImageTag
 from TurkeyApp.portfolio_utils import generate_portfolio_html
 from TurkeyApp.image_support import get_image_data_uri
-from TurkeyApp.ai_utils import get_image_embeddings, upsert_to_pinecone
+from TurkeyApp.ai_utils import (
+    get_image_embeddings, 
+    upsert_to_pinecone,
+    analyze_image_labels,
+    search_pexels_photos
+)
 
 # Constants
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024        # 10 MB hard limit
@@ -113,6 +118,11 @@ class UploadState(rx.State):
     # ---- Bulk selection ----
     selected_image_ids: list[int] = []
     last_selected_id: int = 0
+    
+    # ── AI Similar Photos ─────────────────────
+    image_labels: list[str] = []
+    similar_photos: list[dict] = []
+    ai_loading: bool = False
     selection_mode: bool = False
     show_exif_panel: bool = False
 
@@ -409,6 +419,7 @@ class UploadState(rx.State):
         """Open the lightbox preview for a given image filename."""
         self.preview_filename = filename
         self.show_preview = True
+        return UploadState.run_ai_analysis
 
     def close_preview(self):
         """Close the lightbox preview."""
@@ -421,12 +432,14 @@ class UploadState(rx.State):
         if self.preview_index > 0:
             self.preview_index -= 1
             self.preview_filename = self.filtered_images[self.preview_index].filename
+            return UploadState.run_ai_analysis
 
     def next_image(self):
         """Navigate to the next image in lightbox."""
         if self.preview_index < len(self.filtered_images) - 1:
             self.preview_index += 1
             self.preview_filename = self.filtered_images[self.preview_index].filename
+            return UploadState.run_ai_analysis
 
     def toggle_image_public(self, image_id: int):
         """Flip is_public for a single image."""
@@ -447,6 +460,35 @@ class UploadState(rx.State):
                 session.add(rec)
                 session.commit()
         self._refresh_images()
+
+    async def run_ai_analysis(self):
+        """Analyze current preview image and find similar photos."""
+        if not self.preview_filename:
+            return
+            
+        self.ai_loading = True
+        self.image_labels = []
+        self.similar_photos = []
+        yield # Update UI
+        
+        full_path = os.path.join(UPLOAD_DIR, self.preview_filename)
+        if not os.path.exists(full_path):
+            self.ai_loading = False
+            return
+
+        # 1. Get labels from Vision API
+        labels = await analyze_image_labels(full_path)
+        self.image_labels = labels
+        yield
+        
+        # 2. Search Pexels using the top labels
+        if labels:
+            # Filter out generic labels if many exist
+            query = " ".join(labels[:2]) 
+            photos = await search_pexels_photos(query)
+            self.similar_photos = photos
+            
+        self.ai_loading = False
 
     def toggle_lightbox_public(self):
         """Toggle is_public for the image currently open in the lightbox."""

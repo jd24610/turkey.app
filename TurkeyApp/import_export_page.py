@@ -454,6 +454,33 @@ def lightbox_modal() -> rx.Component:
                                     spacing="2", align="center", width="100%",
                                 ),
                             ),
+                            rx.divider(color="rgba(0,0,0,0.06)", margin_y="8px"),
+                            rx.vstack(
+                                rx.hstack(
+                                    rx.icon("sparkles", size=14, color="#7c3aed"),
+                                    rx.text("Similar Discoveries", size="2", weight="semibold", color=UploadState.text_color),
+                                    rx.cond(UploadState.ai_loading, rx.spinner(size="1")),
+                                    spacing="2", align="center",
+                                ),
+                                rx.hstack(
+                                    rx.foreach(UploadState.image_labels, lambda label: rx.badge(label, variant="soft", color_scheme="purple", size="1", border_radius="full")),
+                                    wrap="wrap", spacing="1",
+                                ),
+                                rx.cond(
+                                    UploadState.similar_photos.length() > 0,
+                                    rx.scroll_area(
+                                        rx.hstack(
+                                            rx.foreach(UploadState.similar_photos, lambda photo: rx.link(
+                                                rx.image(src=photo["thumbnail"], width="140px", height="90px", object_fit="cover", border_radius="10px", transition="transform 0.2s", _hover={"transform": "scale(1.04)", "box_shadow": "0 10px 25px rgba(0,0,0,0.2)"}),
+                                                href=photo["url"], is_external=True,
+                                            )),
+                                            spacing="3", padding="8px 4px 16px 4px",
+                                        ),
+                                        type="hover", scrollbars="horizontal", style={"width": "100%"},
+                                    ),
+                                ),
+                                spacing="3", align="start", width="100%", padding_top="4px",
+                            ),
                             spacing="2",
                             width="100%",
                         ),
