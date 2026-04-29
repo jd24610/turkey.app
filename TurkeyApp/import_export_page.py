@@ -2,6 +2,7 @@
 
 import reflex as rx
 from rxconfig import config
+from TurkeyApp.state import State
 from TurkeyApp.upload_state import UploadState
 
 
@@ -272,7 +273,7 @@ def lightbox_modal() -> rx.Component:
                 rx.vstack(
                     # Image
                     rx.image(
-                        src=config.api_url + "/uploaded_files/" + UploadState.preview_filename,
+                        src=State.backend_url + "/uploaded_files/" + UploadState.preview_filename,
                         max_width="70vw",
                         max_height="72vh",
                         object_fit="contain",
@@ -582,7 +583,7 @@ def image_card(img: rx.Base) -> rx.Component:
             # ── Real thumbnail (click to preview or select) ──
             rx.box(
                 rx.image(
-                    src=config.api_url + "/uploaded_files/" + img.filename,
+                    src=State.backend_url + "/uploaded_files/" + img.filename,
                     width="100%",
                     height=UploadState.thumb_height,
                     object_fit="cover",
@@ -788,7 +789,7 @@ def image_list_row(img: rx.Base) -> rx.Component:
     """Compact list-view row for a single image."""
     return rx.hstack(
         rx.image(
-            src=config.api_url + "/uploaded_files/" + img.filename,
+            src=State.backend_url + "/uploaded_files/" + img.filename,
             width="56px",
             height="42px",
             object_fit="cover",

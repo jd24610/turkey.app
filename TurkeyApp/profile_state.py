@@ -233,31 +233,31 @@ class ProfileState(rx.State):
     @rx.var
     def own_avatar_url(self) -> str:
         if self.own_avatar:
-            return "/uploaded_files/avatars/" + self.own_avatar
+            return self.backend_url + "/uploaded_files/avatars/" + self.own_avatar
         return ""
 
     @rx.var
     def viewed_banner_url(self) -> str:
         if self.viewed_banner:
-            return "/uploaded_files/banners/" + self.viewed_banner
+            return self.backend_url + "/uploaded_files/banners/" + self.viewed_banner
         return ""
 
     @rx.var
     def viewed_avatar_url(self) -> str:
         if self.viewed_avatar:
-            return "/uploaded_files/avatars/" + self.viewed_avatar
+            return self.backend_url + "/uploaded_files/avatars/" + self.viewed_avatar
         return ""
 
     @rx.var
     def own_banner_url(self) -> str:
         if self.own_banner:
-            return "/uploaded_files/banners/" + self.own_banner
+            return self.backend_url + "/uploaded_files/banners/" + self.own_banner
         return ""
 
     @rx.var
     def viewed_lightbox_url(self) -> str:
         if self.viewed_lightbox_filename:
-            return "/uploaded_files/" + self.viewed_lightbox_filename
+            return self.backend_url + "/uploaded_files/" + self.viewed_lightbox_filename
         return ""
 
     @rx.var
@@ -1036,7 +1036,7 @@ class ProfileState(rx.State):
             self.viewed_images = [
                 {
                     "filename": img.filename,
-                    "url": "/uploaded_files/" + img.filename,
+                    "url": self.backend_url + "/uploaded_files/" + img.filename,
                     "original_filename": img.original_filename,
                     "folder_name": img.folder_name,
                     "caption": img.caption,
@@ -1085,7 +1085,7 @@ class ProfileState(rx.State):
                     "name": c.name,
                     "description": c.description,
                     "cover": cover_img.filename if cover_img else "",
-                    "cover_url": ("/uploaded_files/" + cover_img.filename) if cover_img else "",
+                    "cover_url": (self.backend_url + "/uploaded_files/" + cover_img.filename) if cover_img else "",
                     "count": count,
                     "count_text": f"{count} items",
                 })

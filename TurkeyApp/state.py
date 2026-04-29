@@ -4,6 +4,16 @@ from TurkeyApp.profile_state import ProfileState
 
 class State(rx.State):
     """The app state - extracted to resolve circular imports."""
+    
+    @rx.var
+    def backend_url(self) -> str:
+        from rxconfig import config
+        # Use the configured API URL, stripping any trailing /api
+        url = config.api_url
+        if url.endswith("/"):
+            url = url[:-1]
+        return url
+
     id_token_json: str = ""
     user_email: str = ""
     user_name: str = ""
