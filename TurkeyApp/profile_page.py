@@ -95,7 +95,7 @@ def profile_header() -> rx.Component:
                     rx.button(
                         rx.icon("pencil", size=18),
                         "Edit Profile",
-                        on_click=ProfileState.open_edit_modal,
+                        on_click=ProfileState.toggle_edit_profile,
                         size="3",
                         background="linear-gradient(135deg, #7c3aed, #a855f7)",
                         color="white",
