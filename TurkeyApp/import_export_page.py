@@ -458,7 +458,7 @@ def lightbox_modal() -> rx.Component:
                             rx.vstack(
                                 rx.hstack(
                                     rx.icon("sparkles", size=14, color="#7c3aed"),
-                                    rx.text("Similar Discoveries", size="2", weight="semibold", color=UploadState.text_color),
+                                    rx.text("Similar Discoveries", size="2", weight="bold", color=UploadState.text_color),
                                     rx.cond(UploadState.ai_loading, rx.spinner(size="1")),
                                     spacing="2", align="center",
                                 ),
