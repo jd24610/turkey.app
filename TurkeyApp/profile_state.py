@@ -145,6 +145,7 @@ class ProfileState(rx.State):
     # ── Public profile image lightbox ─────────
     show_viewed_lightbox: bool = False
     viewed_lightbox_filename: str = ""
+    viewed_lightbox_url: str = ""        # full image URL for display
     viewed_lightbox_caption: str = ""
     viewed_lightbox_index: int = -1
     viewed_lightbox_image_id: int = 0
@@ -1147,6 +1148,7 @@ class ProfileState(rx.State):
         if 0 <= index < len(self.viewed_images):
             img = self.viewed_images[index]
             self.viewed_lightbox_filename = img.get("filename", "")
+            self.viewed_lightbox_url = img.get("url", "")       # full CDN/backend URL
             self.viewed_lightbox_caption = img.get("caption", "") or ""
             self.viewed_lightbox_image_id = img.get("image_id", 0)
             self.viewed_lightbox_index = index
@@ -1163,6 +1165,7 @@ class ProfileState(rx.State):
         if idx >= 0:
             img = self.viewed_images[idx]
             self.viewed_lightbox_filename = img.get("filename", "")
+            self.viewed_lightbox_url = img.get("url", "")
             self.viewed_lightbox_caption = img.get("caption", "") or ""
             self.viewed_lightbox_image_id = img.get("image_id", 0)
             self.viewed_lightbox_index = idx
@@ -1173,6 +1176,7 @@ class ProfileState(rx.State):
         if idx < len(self.viewed_images):
             img = self.viewed_images[idx]
             self.viewed_lightbox_filename = img.get("filename", "")
+            self.viewed_lightbox_url = img.get("url", "")
             self.viewed_lightbox_caption = img.get("caption", "") or ""
             self.viewed_lightbox_image_id = img.get("image_id", 0)
             self.viewed_lightbox_index = idx
