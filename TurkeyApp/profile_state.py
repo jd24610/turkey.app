@@ -1036,10 +1036,12 @@ class ProfileState(rx.State):
             images = session.exec(
                 query.order_by(ImageRecord.created_at.desc()).limit(60)
             ).all()
+            import os, urllib.parse as _up
+            _backend = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
             self.viewed_images = [
                 {
                     "filename": img.filename,
-                    "url": (self.backend_url + "/uploaded_files/" + img.filename).replace(" ", "%20"),
+                    "url": img.cdn_url if img.cdn_url else f"{_backend}/uploaded_files/{_up.quote(img.filename or '', safe='')}",
                     "original_filename": img.original_filename,
                     "folder_name": img.folder_name,
                     "caption": img.caption,
@@ -1084,11 +1086,14 @@ class ProfileState(rx.State):
                         ImageRecord.is_public == True,
                     )
                 ).one()
+                cover_url = ""
+                if cover_img:
+                    cover_url = cover_img.cdn_url if cover_img.cdn_url else f"{_backend}/uploaded_files/{_up.quote(cover_img.filename or '', safe='')}"
                 self.viewed_collections.append({
                     "name": c.name,
                     "description": c.description,
                     "cover": cover_img.filename if cover_img else "",
-                    "cover_url": (self.backend_url + "/uploaded_files/" + cover_img.filename) if cover_img else "",
+                    "cover_url": cover_url,
                     "count": count,
                     "count_text": f"{count} items",
                 })
