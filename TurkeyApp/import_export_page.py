@@ -77,7 +77,7 @@ def storage_bar() -> rx.Component:
             rx.hstack(
                 rx.hstack(
                     rx.icon("database", size=16, color="#a78bfa"),
-                    rx.text("Storage", size="2", color="#a78bfa", weight="medium"),
+                    rx.text("Storage", size="2", color="#a78bfa", weight="semibold"),
                     spacing="1",
                     align="center",
                 ),
@@ -88,38 +88,51 @@ def storage_bar() -> rx.Component:
                     " MB",
                     size="2",
                     color="#c4b5fd",
+                    weight="medium",
                 ),
                 justify="between",
                 width="100%",
             ),
+            # ── Thicker capsule progress bar with glow ──
             rx.box(
                 rx.box(
-                    height="8px",
-                    border_radius="4px",
-                    background="linear-gradient(90deg, #7c3aed, #a855f7)",
+                    height="12px",
+                    border_radius="99px",
+                    background="linear-gradient(90deg, #6d28d9, #a855f7, #c084fc)",
                     width=UploadState.storage_percent.to(str) + "%",
-                    transition="width 0.5s ease",
+                    transition="width 0.6s cubic-bezier(0.4,0,0.2,1)",
+                    box_shadow="0 0 8px rgba(168,85,247,0.6)",
                 ),
-                background="rgba(124,58,237,0.2)",
-                border_radius="4px",
-                height="8px",
+                background="rgba(124,58,237,0.15)",
+                border_radius="99px",
+                height="12px",
                 width="100%",
                 overflow="hidden",
             ),
-            rx.text(
-                UploadState.storage_percent,
-                "% used",
-                size="1",
-                color="#7c3aed",
-                weight="medium",
+            rx.hstack(
+                rx.text(
+                    UploadState.storage_percent,
+                    "% used",
+                    size="1",
+                    color="#7c3aed",
+                    weight="semibold",
+                ),
+                rx.spacer(),
+                rx.text(
+                    UploadState.quota_mb, " MB limit",
+                    size="1",
+                    color="#a78bfa",
+                ),
+                width="100%",
             ),
             spacing="2",
             width="100%",
         ),
-        padding="16px 20px",
+        padding="18px 22px",
         background="rgba(124,58,237,0.08)",
         border="1px solid rgba(124,58,237,0.2)",
-        border_radius="14px",
+        border_radius="16px",
+        box_shadow="0 2px 12px rgba(124,58,237,0.08)",
         width="100%",
         max_width="420px",
     )
@@ -801,7 +814,7 @@ def image_card(img: rx.Base) -> rx.Component:
             "1px solid #f1f1f1",
         ),
         border_radius="16px",
-        width=UploadState.card_width,
+        width="100%",  # fills grid cell on all screen sizes
         _hover={
             "border_color": "#7c3aed",
             "background": "#f9fafb",
@@ -1114,21 +1127,37 @@ def upload_zone() -> rx.Component:
                 UploadState.is_uploading,
                 rx.vstack(
                     rx.spinner(size="3", color="#a855f7"),
-                    rx.text("Uploading…", size="3", color="#a78bfa"),
+                    rx.text("Uploading…", size="3", color="#a78bfa", weight="medium"),
                     spacing="3",
                     align="center",
                 ),
                 rx.vstack(
-                    rx.icon("cloud-upload", size=48, color=UploadState.accent_hex, opacity="0.6"),
-                    rx.text("Drop images here or click to browse", size="3", color=UploadState.text_color, weight="medium"),
-                    rx.text("PNG, JPG, GIF or WEBP · up to 10MB each", size="2", color=UploadState.sub_text_color),
-                    spacing="2",
+                    rx.box(
+                        rx.icon("cloud-upload", size=52, color=UploadState.accent_hex),
+                        animation="pulse 3s ease-in-out infinite",
+                        style={"@keyframes pulse": {
+                            "0%, 100%": {"opacity": "0.6", "transform": "scale(1)"},
+                            "50%": {"opacity": "1", "transform": "scale(1.08)"},
+                        }},
+                    ),
+                    rx.text(
+                        "Drop images here or click to browse",
+                        size="3",
+                        color=UploadState.text_color,
+                        weight="bold",
+                    ),
+                    rx.text(
+                        "PNG, JPG, GIF or WEBP  ·  up to 10 MB each",
+                        size="2",
+                        color=UploadState.sub_text_color,
+                    ),
+                    spacing="3",
                     align="center",
                 ),
             ),
             justify="center",
             align="center",
-            min_height="200px",
+            min_height="220px",
             width="100%",
         ),
         id="upload_dropzone",
@@ -1141,11 +1170,15 @@ def upload_zone() -> rx.Component:
         },
         max_files=50,
         on_drop=UploadState.handle_upload(rx.upload_files(upload_id="upload_dropzone")),
-        border="2px dashed #e2e8f0",
-        padding="40px",
-        border_radius="16px",
+        border="2px dashed rgba(124,58,237,0.35)",
+        padding="48px 40px",
+        border_radius="20px",
         background=UploadState.bg_theme,
-        _hover={"border_color": UploadState.accent_hex, "background": "#f9fafb"},
+        _hover={
+            "border_color": UploadState.accent_hex,
+            "background": "rgba(124,58,237,0.04)",
+            "box_shadow": "0 0 0 4px rgba(124,58,237,0.08)",
+        },
         transition="all 0.2s ease",
         cursor="pointer",
         width="100%",
@@ -1478,21 +1511,27 @@ def stats_bar() -> rx.Component:
         return rx.box(
             rx.vstack(
                 rx.hstack(
-                    rx.icon(icon, size=18, color=UploadState.accent_hex),
-                    rx.text(value, size="5", weight="bold", color=UploadState.text_color),
+                    rx.icon(icon, size=20, color=UploadState.accent_hex),
+                    rx.text(value, size="6", weight="bold", color=UploadState.text_color),
                     spacing="2",
                     align="center",
                 ),
-                rx.text(label, size="1", color=UploadState.sub_text_color),
+                rx.text(label, size="1", color=UploadState.sub_text_color, weight="medium"),
                 spacing="1",
                 align="start",
             ),
-            padding="16px 20px",
+            padding="20px 24px",
             background=UploadState.bg_theme,
-            border="1px solid " + UploadState.border_color,
-            border_radius="14px",
+            border="1px solid transparent",
+            border_radius="16px",
+            box_shadow="0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04)",
             flex="1",
-            min_width="110px",
+            min_width="120px",
+            transition="box-shadow 0.2s ease, transform 0.2s ease",
+            _hover={
+                "box_shadow": "0 8px 20px rgba(124,58,237,0.15)",
+                "transform": "translateY(-2px)",
+            },
         )
     return rx.hstack(
         tile("images", UploadState.total_images, "Images"),
@@ -1502,6 +1541,12 @@ def stats_bar() -> rx.Component:
         spacing="4",
         width="100%",
         flex_wrap="wrap",
+        # 2x2 on phone, 4-in-a-row on desktop
+        style={
+            "display": "grid",
+            "gridTemplateColumns": "repeat(auto-fill, minmax(140px, 1fr))",
+            "gap": "16px",
+        },
     )
 
 
@@ -1660,15 +1705,29 @@ def import_export_page() -> rx.Component:
                         box_shadow="0 4px 20px rgba(124,58,237,0.4)",
                     ),
                     rx.vstack(
-                        rx.heading("Media Library", size="6", color=UploadState.text_color),
-                        rx.text("Import · Manage · Export", size="2", color=UploadState.sub_text_color),
+                        rx.heading(
+                            "Media Library",
+                            size=["5", "6", "7"],  # smaller on mobile
+                            color=UploadState.text_color,
+                            weight="bold",
+                            letter_spacing="-0.5px",
+                        ),
+                        rx.text(
+                            "Import · Manage · Export",
+                            size="2",
+                            color=UploadState.sub_text_color,
+                            letter_spacing="0.5px",
+                        ),
                         spacing="0",
                         align="start",
                     ),
                     spacing="4",
                     align="center",
                 ),
-                storage_bar(),
+                rx.box(
+                    storage_bar(),
+                    width=["100%", "100%", "auto"],  # full width on mobile
+                ),
                 justify="between",
                 align="center",
                 width="100%",
@@ -1701,7 +1760,7 @@ def import_export_page() -> rx.Component:
                     border="1px solid " + UploadState.border_color,
                     border_radius="20px",
                     flex="1",
-                    min_width="320px",
+                    min_width=["100%", "100%", "320px"],  # full width on mobile
                 ),
 
                 # Folder management
@@ -1787,7 +1846,7 @@ def import_export_page() -> rx.Component:
                     background="rgba(255,255,255,0.03)",
                     border="1px solid rgba(124,58,237,0.2)",
                     border_radius="20px",
-                    width="320px",
+                    width=["100%", "100%", "320px"],  # full width on mobile
                     flex_shrink="0",
                 ),
 
@@ -1929,10 +1988,13 @@ def import_export_page() -> rx.Component:
                             UploadState.view_mode == "grid",
                             rx.box(
                                 rx.foreach(UploadState.filtered_images, image_card),
-                                display="flex",
-                                flex_wrap="wrap",
-                                gap="16px",
-                                padding_top="8px",
+                                style={
+                                    "display": "grid",
+                                    "gridTemplateColumns": "repeat(auto-fill, minmax(180px, 1fr))",
+                                    "gap": "16px",
+                                    "paddingTop": "8px",
+                                    "width": "100%",
+                                },
                             ),
                             rx.vstack(
                                 rx.foreach(UploadState.filtered_images, image_list_row),
@@ -1942,12 +2004,22 @@ def import_export_page() -> rx.Component:
                             ),
                         ),
                         rx.vstack(
-                            rx.icon("image-off", size=48, color="rgba(124,58,237,0.3)"),
-                            rx.text("No images yet.", size="3", color=UploadState.sub_text_color),
-                            rx.text("Upload your first image above!", size="2", color="#4b5563"),
+                            rx.icon("image-off", size=52, color="rgba(124,58,237,0.3)"),
+                            rx.text(
+                                "No images yet!",
+                                size="4",
+                                weight="bold",
+                                color=UploadState.text_color,
+                            ),
+                            rx.text(
+                                "Drag and drop files above to get started.",
+                                size="2",
+                                color=UploadState.sub_text_color,
+                                text_align="center",
+                            ),
                             spacing="3",
                             align="center",
-                            padding="40px 0",
+                            padding=["24px 0", "40px 0"],
                             width="100%",
                         ),
                     ),
@@ -1964,7 +2036,7 @@ def import_export_page() -> rx.Component:
             spacing="6",
             width="100%",
             max_width="1200px",
-            padding="32px 24px",
+            padding=["16px 12px", "24px 16px", "32px 24px"],
         ),
         min_height="100vh",
         background=UploadState.bg_theme,
