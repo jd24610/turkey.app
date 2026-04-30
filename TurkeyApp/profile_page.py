@@ -201,25 +201,44 @@ def profile_tabs() -> rx.Component:
 def profile_gallery_card(img: rx.Base, index: int) -> rx.Component:
     """A card for human-viewable content."""
     return rx.box(
-        rx.vstack(
+        # ── Fixed-height thumbnail ──────────────────────────────────────
+        rx.box(
             rx.image(
                 src=img["url"],
-                width="100%", height="auto",
-                border_radius="12px",
-                transition="transform 0.3s ease",
-                _hover={"transform": "scale(1.02)"},
+                width="100%",
+                height="100%",
+                object_fit="cover",
+                display="block",
+                transition="transform 0.35s ease",
+                _hover={"transform": "scale(1.04)"},
             ),
-            rx.cond(
-                img["caption"] != "",
-                rx.text(img["caption"], size="2", color="#374151", margin_top="8px", padding_x="4px"),
-                rx.box(),
+            width="100%",
+            height="220px",
+            overflow="hidden",
+            border_radius="14px",
+        ),
+        # ── Caption ─────────────────────────────────────────────────────
+        rx.cond(
+            img["caption"] != "",
+            rx.text(
+                img["caption"],
+                size="2",
+                color="#374151",
+                margin_top="8px",
+                padding_x="2px",
+                line_limit=2,
             ),
-            spacing="0", align="start",
+            rx.box(),
         ),
         on_click=lambda: ProfileState.open_viewed_image({"index": index}),
         cursor="pointer",
         width="100%",
-        margin_bottom="24px",
+        margin_bottom="20px",
+        border_radius="16px",
+        padding="0",
+        box_shadow="0 2px 12px rgba(0,0,0,0.06)",
+        transition="box-shadow 0.2s ease, transform 0.2s ease",
+        _hover={"box_shadow": "0 8px 28px rgba(124,58,237,0.15)", "transform": "translateY(-2px)"},
     )
 
 
