@@ -15,6 +15,6 @@ config = rx.Config(
         "https://turkey-app-frontend.onrender.com",
     ],
     google_client_id=os.getenv("GOOGLE_CLIENT_ID"),
-    # This removes the "Built with Reflex" badge
+    show_built_with_reflex=False,  # Hide the Reflex "R" badge
     admin_dash=False,
 )
