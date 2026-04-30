@@ -1707,7 +1707,7 @@ def import_export_page() -> rx.Component:
                     rx.vstack(
                         rx.heading(
                             "Media Library",
-                            size=["5", "6", "7"],  # smaller on mobile
+                            size="7",
                             color=UploadState.text_color,
                             weight="bold",
                             letter_spacing="-0.5px",
@@ -1726,7 +1726,7 @@ def import_export_page() -> rx.Component:
                 ),
                 rx.box(
                     storage_bar(),
-                    width=["100%", "100%", "auto"],  # full width on mobile
+                    width="100%",
                 ),
                 justify="between",
                 align="center",
@@ -1760,7 +1760,7 @@ def import_export_page() -> rx.Component:
                     border="1px solid " + UploadState.border_color,
                     border_radius="20px",
                     flex="1",
-                    min_width=["100%", "100%", "320px"],  # full width on mobile
+                    min_width="0",
                 ),
 
                 # Folder management
@@ -1846,7 +1846,7 @@ def import_export_page() -> rx.Component:
                     background="rgba(255,255,255,0.03)",
                     border="1px solid rgba(124,58,237,0.2)",
                     border_radius="20px",
-                    width=["100%", "100%", "320px"],  # full width on mobile
+                    width="100%",
                     flex_shrink="0",
                 ),
 
@@ -2019,7 +2019,7 @@ def import_export_page() -> rx.Component:
                             ),
                             spacing="3",
                             align="center",
-                            padding=["24px 0", "40px 0"],
+                            padding="32px 0",
                             width="100%",
                         ),
                     ),
@@ -2036,7 +2036,7 @@ def import_export_page() -> rx.Component:
             spacing="6",
             width="100%",
             max_width="1200px",
-            padding=["16px 12px", "24px 16px", "32px 24px"],
+            padding="24px 16px",
         ),
         min_height="100vh",
         background=UploadState.bg_theme,
