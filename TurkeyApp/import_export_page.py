@@ -77,7 +77,7 @@ def storage_bar() -> rx.Component:
             rx.hstack(
                 rx.hstack(
                     rx.icon("database", size=16, color="#a78bfa"),
-                    rx.text("Storage", size="2", color="#a78bfa", weight="semibold"),
+                    rx.text("Storage", size="2", color="#a78bfa", weight="bold"),
                     spacing="1",
                     align="center",
                 ),
@@ -115,7 +115,7 @@ def storage_bar() -> rx.Component:
                     "% used",
                     size="1",
                     color="#7c3aed",
-                    weight="semibold",
+                    weight="bold",
                 ),
                 rx.spacer(),
                 rx.text(
