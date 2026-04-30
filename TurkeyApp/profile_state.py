@@ -145,7 +145,7 @@ class ProfileState(rx.State):
     # ── Public profile image lightbox ─────────
     show_viewed_lightbox: bool = False
     viewed_lightbox_filename: str = ""
-    viewed_lightbox_url: str = ""        # full image URL for display
+    viewed_lightbox_cdn_url: str = ""      # CDN URL when available (avoids name conflict with @rx.var)
     viewed_lightbox_caption: str = ""
     viewed_lightbox_index: int = -1
     viewed_lightbox_image_id: int = 0
@@ -257,8 +257,14 @@ class ProfileState(rx.State):
 
     @rx.var
     def viewed_lightbox_url(self) -> str:
+        # Prefer explicit CDN URL, fall back to filename-based backend URL
+        if self.viewed_lightbox_cdn_url:
+            return self.viewed_lightbox_cdn_url
         if self.viewed_lightbox_filename:
-            return self.backend_url + "/uploaded_files/" + self.viewed_lightbox_filename
+            import os as _os
+            _backend = _os.getenv("API_URL", "http://localhost:8000").rstrip("/")
+            import urllib.parse as _up
+            return f"{_backend}/uploaded_files/{_up.quote(self.viewed_lightbox_filename, safe='')}"
         return ""
 
     @rx.var
@@ -1148,7 +1154,7 @@ class ProfileState(rx.State):
         if 0 <= index < len(self.viewed_images):
             img = self.viewed_images[index]
             self.viewed_lightbox_filename = img.get("filename", "")
-            self.viewed_lightbox_url = img.get("url", "")       # full CDN/backend URL
+            self.viewed_lightbox_cdn_url = img.get("url", "") if img.get("url", "").startswith("http") else ""
             self.viewed_lightbox_caption = img.get("caption", "") or ""
             self.viewed_lightbox_image_id = img.get("image_id", 0)
             self.viewed_lightbox_index = index
@@ -1165,7 +1171,7 @@ class ProfileState(rx.State):
         if idx >= 0:
             img = self.viewed_images[idx]
             self.viewed_lightbox_filename = img.get("filename", "")
-            self.viewed_lightbox_url = img.get("url", "")
+            self.viewed_lightbox_cdn_url = img.get("url", "") if img.get("url", "").startswith("http") else ""
             self.viewed_lightbox_caption = img.get("caption", "") or ""
             self.viewed_lightbox_image_id = img.get("image_id", 0)
             self.viewed_lightbox_index = idx
@@ -1176,7 +1182,7 @@ class ProfileState(rx.State):
         if idx < len(self.viewed_images):
             img = self.viewed_images[idx]
             self.viewed_lightbox_filename = img.get("filename", "")
-            self.viewed_lightbox_url = img.get("url", "")
+            self.viewed_lightbox_cdn_url = img.get("url", "") if img.get("url", "").startswith("http") else ""
             self.viewed_lightbox_caption = img.get("caption", "") or ""
             self.viewed_lightbox_image_id = img.get("image_id", 0)
             self.viewed_lightbox_index = idx
